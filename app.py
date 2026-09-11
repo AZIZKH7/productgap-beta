@@ -10,7 +10,11 @@ st.set_page_config(page_title="ProductGap — Find What Competitors Miss", page_
 
 st.markdown("""
 <style>
-.block-container {max-width: 1120px; padding-top: 2.3rem; padding-bottom: 4rem;}
+.block-container {
+    max-width: 1120px;
+    padding-top: 4.5rem !important;
+    padding-bottom: 4rem;
+}
 h1 {font-size: 3.1rem !important; letter-spacing: -0.045em;}
 .pg-muted {color:#8d96a5; font-size:1.02rem;}
 .pg-eyebrow {font-size:.78rem; letter-spacing:.13em; font-weight:700; text-transform:uppercase; color:#8d96a5;}
