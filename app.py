@@ -35,6 +35,7 @@ PAYMENT_URL = secret("PAYMENT_URL")
 SUPPORT_EMAIL = secret("SUPPORT_EMAIL", "")
 PRODUCT_PRICE = secret("PRODUCT_PRICE", "$9")
 MODEL = secret("PRODUCTGAP_MODEL", "gpt-5.6-luna")
+PADDLE_RETURN_TOKEN = secret("PADDLE_RETURN_TOKEN")
 
 SOURCE_QUALITY = {
     "retailer_review":1.0, "marketplace_review":1.0, "professional_review":0.82,
@@ -266,6 +267,14 @@ b.markdown("**② Research the market**\n\nCustomer pain, demand proxies and com
 c.markdown("**③ Get a verdict**\n\nWhat to build differently and what could kill the idea.")
 st.divider()
 
+if "authorized" not in st.session_state:
+    st.session_state.authorized = False
+
+paid_token = st.query_params.get("paid")
+
+if PADDLE_RETURN_TOKEN and paid_token == PADDLE_RETURN_TOKEN:
+    st.session_state.authorized = True
+    st.query_params.clear()
 if BETA_ACCESS_CODE:
     if "authorized" not in st.session_state: st.session_state.authorized=False
     if not st.session_state.authorized:
