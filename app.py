@@ -328,7 +328,7 @@ if BETA_ACCESS_CODE:
         st.subheader("ProductGap — Founding Beta")
         st.caption("Secure $9 test checkout powered by Paddle.")
 
-       checkout_html = f"""
+        checkout_html = f"""
 <!DOCTYPE html>
 <html>
 <head>
