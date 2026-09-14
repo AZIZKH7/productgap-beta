@@ -655,7 +655,7 @@ if not st.session_state.authorized:
 
         spacer_left, main, spacer_right = st.columns([0.12, 1, 0.12])
 
-        with main:
+    with main:
         st.markdown("## Find the opportunity your competitors missed.")
 
             st.write(
@@ -688,7 +688,7 @@ if not st.session_state.authorized:
                 use_container_width=True
             )
 
-            st.markdown(
+        st.markdown(
                 """
                 <div class="trust-line">
                     🔒 Secure one-time checkout powered by Paddle
