@@ -39,7 +39,10 @@ MODEL = secret("PRODUCTGAP_MODEL", "gpt-5.6-luna")
 PADDLE_RETURN_TOKEN = secret("PADDLE_RETURN_TOKEN")
 PADDLE_API_KEY = secret("PADDLE_API_KEY")
 PADDLE_PRICE_ID = secret("PADDLE_PRICE_ID")
+if "authorized" not in st.session_state:
+    st.session_state.authorized = False
 
+checkout_mode = st.query_params.get("checkout") == "1"
 SOURCE_QUALITY = {
     "retailer_review":1.0, "marketplace_review":1.0, "professional_review":0.82,
     "forum":0.65, "reddit":0.65, "manufacturer":0.52, "blog":0.55, "other":0.45
@@ -308,9 +311,7 @@ def verify_paddle_transaction(transaction_id):
         return False
         
 if BETA_ACCESS_CODE:
-    if "authorized" not in st.session_state:
-        st.session_state.authorized = False
-
+    
     # Unlock after successful Paddle sandbox redirect
     paid_token = st.query_params.get("paid")
 
@@ -319,7 +320,7 @@ if BETA_ACCESS_CODE:
         st.query_params.clear()
 
     # If not authorized, show the payment/access gate and STOP the app here
-    checkout_mode = st.query_params.get("checkout") == "1"
+    
 
     if not st.session_state.authorized and checkout_mode:
         st.subheader("ProductGap — Founding Beta")
