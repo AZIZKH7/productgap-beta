@@ -39,6 +39,8 @@ MODEL = secret("PRODUCTGAP_MODEL", "gpt-5.6-luna")
 PADDLE_RETURN_TOKEN = secret("PADDLE_RETURN_TOKEN")
 PADDLE_API_KEY = secret("PADDLE_API_KEY")
 PADDLE_PRICE_ID = secret("PADDLE_PRICE_ID")
+PADDLE_CLIENT_TOKEN = secret("PADDLE_CLIENT_TOKEN")
+APP_URL = secret("APP_URL", "https://marketgap-ai.streamlit.app")
 if "authorized" not in st.session_state:
     st.session_state.authorized = False
 
