@@ -277,6 +277,11 @@ if PADDLE_RETURN_TOKEN and paid_token == PADDLE_RETURN_TOKEN:
     st.query_params.clear()
 if BETA_ACCESS_CODE:
     if "authorized" not in st.session_state: st.session_state.authorized=False
+       paid_token = st.query_params.get("paid")
+
+    if PADDLE_RETURN_TOKEN and paid_token == PADDLE_RETURN_TOKEN:
+        st.session_state.authorized = True
+        st.query_params.clear()
     if not st.session_state.authorized:
         left,right=st.columns([1.4,1])
         with left:
