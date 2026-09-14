@@ -362,11 +362,11 @@ if "authorized" not in st.session_state:
 
 paid_token = st.query_params.get("paid")
 def verify_paddle_transaction(transaction_id):
-def supabase_headers():
-    return {
+    def supabase_headers():
+        return {
         "apikey": SUPABASE_SECRET_KEY,
         "Content-Type": "application/json",
-    }
+        }
 
 
 def ensure_analysis_credit(transaction_id):
