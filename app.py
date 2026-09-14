@@ -2,7 +2,7 @@ import os
 import re
 import json
 import html
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 import pandas as pd
 import streamlit as st
 import requests
@@ -357,21 +357,73 @@ THEME_ALIASES = {
 }
 
 def canonical_theme(theme):
-    low = str(theme).lower()
+    """Map a model theme to a canonical bucket using whole-token matching.
+
+    Whole-token matching prevents false matches such as ``price`` -> ``ice``,
+    ``benefit`` -> ``fit``, or ``appearance`` -> ``app``.
+    """
+    raw = re.sub(r"[^a-z0-9]+", " ", str(theme).lower()).strip()
     for needle, canonical in THEME_ALIASES.items():
-        if needle in low:
+        token = re.sub(r"[^a-z0-9]+", " ", needle.lower()).strip()
+        if token and re.search(rf"(?:^|\s){re.escape(token)}(?:$|\s)", raw):
             return canonical
-    return re.sub(r"\s+"," ",str(theme)).strip()[:74] or "Other"
+    return re.sub(r"\s+", " ", str(theme)).strip()[:74] or "Other"
 
 def normalize_url(url):
+    """Normalize a source URL for evidence matching.
+
+    Query strings and fragments are intentionally ignored here because search tools
+    often surface the same source with tracking parameters.
+    """
     try:
-        p=urlparse(str(url).strip())
-        return urlunparse((p.scheme.lower(),p.netloc.lower().replace("www.",""),p.path.rstrip("/"),"","",""))
+        p = urlparse(str(url).strip())
+        host = (p.hostname or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        port = f":{p.port}" if p.port else ""
+        return urlunparse((p.scheme.lower(), host + port, p.path.rstrip("/"), "", "", ""))
     except Exception:
-        return str(url)
+        return str(url).strip()
+
+def product_url_key(url):
+    """Canonical key for distinguishing competitor product URLs.
+
+    Preserve meaningful query parameters (some stores identify SKUs in the query)
+    while removing common tracking parameters.
+    """
+    try:
+        p = urlparse(str(url).strip())
+        host = (p.hostname or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        port = f":{p.port}" if p.port else ""
+        tracking_keys = {"ref", "ref_", "tag", "source", "campaign", "fbclid", "gclid"}
+        query = []
+        for key, value in parse_qsl(p.query, keep_blank_values=True):
+            low = key.lower()
+            if low.startswith("utm_") or low in tracking_keys:
+                continue
+            query.append((key, value))
+        query.sort()
+        return urlunparse((p.scheme.lower(), host + port, p.path.rstrip("/"), "", urlencode(query, doseq=True), ""))
+    except Exception:
+        return str(url).strip()
 
 def valid_url(url):
-    return bool(re.match(r"^https?://",str(url).strip()))
+    text = str(url).strip()
+    if not text or len(text) > 2048 or any(ch.isspace() for ch in text):
+        return False
+    try:
+        p = urlparse(text)
+    except Exception:
+        return False
+    if p.scheme.lower() not in {"http", "https"}:
+        return False
+    if not p.hostname or "." not in p.hostname:
+        return False
+    if p.username or p.password:
+        return False
+    return True
 
 def clean_json(txt):
     txt=(txt or "").strip()
@@ -420,6 +472,8 @@ RULES:
 - Paraphrase customer feedback.
 - Prefer retailer/marketplace reviews and independent professional testing.
 - Search for corroboration across independent domains where practical.
+- For every evidence item, competitor_index must be 1, 2, or 3 and must identify which supplied competitor URL the evidence concerns.
+- Evidence themes must be concise issue labels, not marketing copy.
 - Separate recurring ownership pain from personal preference.
 - Be willing to say the opportunity is weak.
 - Return JSON only.
@@ -441,6 +495,7 @@ RETURN:
   "evidence": [
     {{
       "competitor": "...",
+      "competitor_index": 1,
       "theme": "...",
       "observation": "...",
       "severity": 1,
@@ -484,24 +539,62 @@ def run_research(products):
     except Exception: dump={}
     return data,collect_urls(dump)
 
-def evidence_table(data,sources):
-    source_norm={normalize_url(x) for x in sources}
-    source_domains={urlparse(x).netloc.lower().replace("www.","") for x in sources}
-    rows=[]
-    for e in data.get("evidence",[]):
-        src=e.get("source_url","")
-        dom=urlparse(src).netloc.lower().replace("www.","") if src else ""
-        verified=normalize_url(src) in source_norm or (dom and dom in source_domains)
-        try: sev=max(1,min(5,int(e.get("severity",3))))
-        except: sev=3
-        rec=str(e.get("recurrence","weak")).lower()
-        rec_w={"strong":1.0,"moderate":0.7,"weak":0.4}.get(rec,.4)
-        sq=SOURCE_QUALITY.get(str(e.get("source_type","other")).lower(),.45)
+def evidence_table(data, sources):
+    # Only evidence URLs that were actually surfaced by the web-search tool are
+    # allowed to contribute to scoring. Same-domain evidence is not enough.
+    source_norm = {normalize_url(x) for x in sources if x}
+    rows = []
+
+    for e in data.get("evidence", []):
+        src = str(e.get("source_url", "") or "").strip()
+        try:
+            parsed = urlparse(src)
+            dom = (parsed.hostname or "").lower()
+            if dom.startswith("www."):
+                dom = dom[4:]
+        except Exception:
+            dom = ""
+
+        verified = bool(src) and normalize_url(src) in source_norm
+
+        try:
+            sev = max(1, min(5, int(e.get("severity", 3))))
+        except (TypeError, ValueError):
+            sev = 3
+
+        rec = str(e.get("recurrence", "weak")).lower()
+        rec_w = {"strong": 1.0, "moderate": 0.7, "weak": 0.4}.get(rec, 0.4)
+        sq = SOURCE_QUALITY.get(str(e.get("source_type", "other")).lower(), 0.45)
+
+        try:
+            competitor_index = int(e.get("competitor_index"))
+            if competitor_index not in {1, 2, 3}:
+                competitor_index = None
+        except (TypeError, ValueError):
+            competitor_index = None
+
+        competitor_name = str(e.get("competitor", "") or "").strip()
+        competitor_key = (
+            f"competitor_{competitor_index}"
+            if competitor_index
+            else re.sub(r"\s+", " ", competitor_name.lower()).strip()
+        )
+
         rows.append({
-            "Competitor":e.get("competitor",""),"Theme":canonical_theme(e.get("theme","")),
-            "Observation":e.get("observation",""),"Severity":sev,"Recurrence":rec.title(),
-            "Source":src,"Source domain":dom,"Verified":verified,"Weight":rec_w*sq*(1 if verified else .65)
+            "Competitor": competitor_name or (f"Competitor {competitor_index}" if competitor_index else "Unknown"),
+            "Competitor key": competitor_key,
+            "Theme": canonical_theme(e.get("theme", "")),
+            "Observation": e.get("observation", ""),
+            "Severity": sev,
+            "Recurrence": rec.title(),
+            "Source": src,
+            "Source domain": dom,
+            "Verified": verified,
+            # Unverified model-cited URLs may still be displayed for transparency,
+            # but they contribute zero evidence weight to ProductGap scores.
+            "Weight": rec_w * sq if verified else 0.0,
         })
+
     return pd.DataFrame(rows)
 
 def market_score(m):
@@ -511,22 +604,50 @@ def market_score(m):
     d,c,df,p,cf=v("demand_strength"),v("competition_intensity"),v("differentiation_room"),v("price_headroom"),v("data_confidence")
     return round(d*6+(6-c)*4+df*4+p*3+cf*3)
 
-def theme_scores(evdf):
-    if evdf.empty:return {}
-    ncomp=max(evdf["Competitor"].nunique(),1); out={}
-    for theme,g in evdf.groupby("Theme"):
-        breadth=g["Competitor"].nunique()/ncomp
-        domains=len(set(d for d in g["Source domain"] if d))
-        avg_sev=g["Severity"].mean()
-        out[theme]=min(100,round(30*breadth+20*avg_sev/5+min(20,domains*6)+min(30,g["Weight"].sum()*8)))
+def theme_scores(evdf, total_competitors=3):
+    if evdf.empty:
+        return {}
+
+    out = {}
+    total_competitors = max(int(total_competitors or 3), 1)
+
+    for theme, group in evdf.groupby("Theme"):
+        # Only verified evidence affects the score. Breadth is always measured
+        # against all three submitted competitors, not just those that happened
+        # to receive evidence from the model.
+        verified = group[group["Verified"] == True]  # noqa: E712
+        if verified.empty:
+            out[theme] = 0
+            continue
+
+        competitor_col = "Competitor key" if "Competitor key" in verified.columns else "Competitor"
+        breadth = min(1.0, verified[competitor_col].nunique() / total_competitors)
+        domains = len({d for d in verified["Source domain"] if d})
+        avg_sev = verified["Severity"].mean()
+        evidence_weight = verified["Weight"].sum()
+
+        out[theme] = min(
+            100,
+            round(
+                30 * breadth
+                + 20 * avg_sev / 5
+                + min(20, domains * 6)
+                + min(30, evidence_weight * 8)
+            ),
+        )
+
     return out
 
-def ranked_ops(data,evdf,mscore):
-    ts=theme_scores(evdf); default=max(ts.values()) if ts else 40; rows=[]
-    for o in data.get("opportunities",[]):
-        themes=[canonical_theme(x) for x in o.get("evidence_themes",[])]
-        matched=[ts[t] for t in themes if t in ts]
-        escore=round(sum(matched)/len(matched)) if matched else default
+def ranked_ops(data, evdf, mscore):
+    ts = theme_scores(evdf, total_competitors=3)
+    rows = []
+    for o in data.get("opportunities", []):
+        themes = [canonical_theme(x) for x in o.get("evidence_themes", [])]
+        matched = [ts[t] for t in themes if t in ts and ts[t] > 0]
+        # An opportunity with no verified matching evidence receives no evidence
+        # points. It can still be shown, but cannot earn a strong verdict simply
+        # by inheriting the strongest unrelated theme.
+        escore = round(sum(matched) / len(matched)) if matched else 0
         def five(k):
             try:return max(1,min(5,int(o.get(k,3))))
             except:return 3
@@ -682,8 +803,8 @@ def render_report(state, report_markdown):
         st.markdown(
             f'''<div class="metric-card">
                     <div class="metric-label">Evidence</div>
-                    <div class="metric-value">{len(evdf)}</div>
-                    <div class="metric-foot">Customer / market observations</div>
+                    <div class="metric-value">{int(evdf["Verified"].sum()) if not evdf.empty and "Verified" in evdf.columns else 0}</div>
+                    <div class="metric-foot">Verified source-backed observations</div>
                 </div>''',
             unsafe_allow_html=True,
         )
@@ -697,6 +818,10 @@ def render_report(state, report_markdown):
             unsafe_allow_html=True,
         )
 
+    st.markdown(
+        '<div class="result-note">Scores are ProductGap heuristics based on verified public evidence and model-rated market factors — not measured sales or demand data.</div>',
+        unsafe_allow_html=True,
+    )
     st.write("")
     verdict_class = "verdict-good" if best["score"] >= 60 else "verdict-warn"
     with st.container(border=True):
@@ -1382,7 +1507,7 @@ if submitted:
         st.error("Enter 3 valid http/https product URLs.")
         st.stop()
 
-    normalized_products = [normalize_url(url) for url in products]
+    normalized_products = [product_url_key(url) for url in products]
     if len(set(normalized_products)) != 3:
         st.error("Use three different competitor product URLs.")
         st.stop()
