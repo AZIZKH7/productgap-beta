@@ -570,7 +570,7 @@ if not st.session_state.authorized:
                 unsafe_allow_html=True
             )
 
-            with st.expander("Already purchased or have an access code?"):
+            with st.expander("Have an access code?"):
 
                 code = st.text_input(
                     "Access code",
