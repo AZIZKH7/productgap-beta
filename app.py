@@ -282,31 +282,40 @@ if BETA_ACCESS_CODE:
         st.query_params.clear()
     
     if not st.session_state.authorized:
-        left,right=st.columns([1.4,1])
-       
-        with left:
-            st.subheader(f"Founding Beta — {PRODUCT_PRICE}")
-            st.write("One full market analysis with ranked product opportunities, evidence, validation tests and a downloadable report.")
-           
-            if PAYMENT_URL:
-                st.link_button(f"Get beta access — {PRODUCT_PRICE}",PAYMENT_URL,use_container_width=True
-                              )
-            else:
-                st.info("Founding beta checkout is being connected.")
-                
-        with right:
-            st.subheader("Already have access?")
-            code=st.text_input
-            ("Access code",
-             type="password",
-            label_visibility="collapsed",
-            placeholder="Enter beta access code"
-            )
-            if st.button
-            ("Unlock ProductGap",
-             type="primary",
-            use_container_width=True
-            ):
+        left, right = st.columns([1.4, 1])
+
+with left:
+    st.subheader(f"Founding Beta — {PRODUCT_PRICE}")
+    st.write(
+        "One full market analysis with ranked product opportunities, "
+        "evidence, validation tests and a downloadable report."
+    )
+
+    if PAYMENT_URL:
+        st.link_button(
+            f"Get beta access — {PRODUCT_PRICE}",
+            PAYMENT_URL,
+            use_container_width=True,
+        )
+    else:
+        st.info("Founding beta checkout is being connected.")
+
+with right:
+    st.subheader("Already have access?")
+    code = st.text_input(
+        "Access code",
+        type="password",
+        label_visibility="collapsed",
+        placeholder="Enter beta access code",
+    )
+
+    if st.button(
+        "Unlock ProductGap",
+        type="primary",
+        use_container_width=True,
+    ):
+        # Keep your existing access-code validation here.
+        pass
                 if code==BETA_ACCESS_CODE:
                     st.session_state.authorized=True; 
                     st.rerun()
