@@ -546,20 +546,246 @@ def verdict(score):
     if score>=60:return "PROMISING — VALIDATE"
     return "DO NOT BUILD YET"
 
-def report_text(data,mscore,ops,sources):
-    lines=["# ProductGap Opportunity Report","",f"Category: {data.get('category','Unknown')}",f"Market score: {mscore}/100","",
-           "## Executive summary",data.get("executive_summary",""),""]
+def report_text(data, mscore, ops, sources):
+    lines = [
+        "# ProductGap Opportunity Report",
+        "",
+        f"Category: {data.get('category', 'Unknown')}",
+        f"ProductGap market score: {mscore}/100",
+        "",
+        "## Executive summary",
+        data.get("executive_summary", ""),
+        "",
+    ]
+
+    market = data.get("market", {})
+    lines += [
+        "## Market assessment",
+        f"- Demand: {market.get('demand_strength', '?')}/5",
+        f"- Competition: {market.get('competition_intensity', '?')}/5",
+        f"- Differentiation room: {market.get('differentiation_room', '?')}/5",
+        f"- Price room: {market.get('price_headroom', '?')}/5",
+        f"- Data confidence: {market.get('data_confidence', '?')}/5",
+        f"- Rationale: {market.get('rationale', '')}",
+        "",
+    ]
+
     if ops:
-        b=ops[0]
-        lines += [f"## #1 Opportunity — {b['name']} ({b['score']}/100)",f"Verdict: {verdict(b['score'])}",
-                  f"Target buyer: {b['target']}",f"Buyer problem: {b['problem']}",f"Why it might win: {b['why']}",
-                  f"Positioning: {b['positioning']}","","Recommended changes:"]
-        lines += [f"- {x}" for x in b["changes"]]
-        lines += ["","Validation tests:"]+[f"- {x}" for x in b["tests"]]
-        lines += ["","Kill conditions:"]+[f"- {x}" for x in b["kills"]]
-    lines += ["","## Limitation","Publicly indexed web research; not a complete review scrape or guarantee of commercial success.",
-              "","## Sources surfaced"]+[f"- {x}" for x in sources[:50]]
+        lines.append("## Ranked product opportunities")
+        lines.append("")
+        for idx, opportunity in enumerate(ops, start=1):
+            lines += [
+                f"### #{idx} {opportunity['name']} ({opportunity['score']}/100)",
+                f"Verdict: {verdict(opportunity['score'])}",
+                f"Target buyer: {opportunity['target']}",
+                f"Buyer problem: {opportunity['problem']}",
+                f"Why it might win: {opportunity['why']}",
+                f"Positioning: {opportunity['positioning']}",
+                "",
+                "Recommended changes:",
+            ]
+            lines += [f"- {item}" for item in opportunity["changes"]]
+            lines += ["", "Validation tests:"]
+            lines += [f"- {item}" for item in opportunity["tests"]]
+            lines += ["", "Kill conditions:"]
+            lines += [f"- {item}" for item in opportunity["kills"]]
+            lines.append("")
+    else:
+        lines += [
+            "## Verdict",
+            "No defensible product opportunity was found from the available public evidence.",
+            "",
+        ]
+
+    lines += [
+        "## Limitation",
+        "ProductGap uses publicly indexed web research. It does not claim to scrape every customer review or guarantee commercial success.",
+        "",
+        "## Sources surfaced",
+    ]
+    lines += [f"- {url}" for url in sources[:50]]
     return "\n".join(lines)
+
+
+def build_report_state(data, sources, evdf, mscore, ops):
+    evidence_rows = [] if evdf.empty else json.loads(evdf.to_json(orient="records"))
+    return {
+        "data": data,
+        "sources": sources,
+        "evidence_rows": evidence_rows,
+        "market_score": int(mscore),
+        "opportunities": ops,
+    }
+
+
+def report_state_parts(state):
+    state = state or {}
+    data = state.get("data") or {}
+    sources = state.get("sources") or []
+    mscore = int(state.get("market_score", 0) or 0)
+    ops = state.get("opportunities") or []
+    rows = state.get("evidence_rows") or []
+    evdf = pd.DataFrame(rows)
+    return data, sources, evdf, mscore, ops
+
+
+def render_report(state, report_markdown):
+    data, sources, evdf, mscore, ops = report_state_parts(state)
+
+    st.markdown('<div class="section-kicker">OPPORTUNITY REPORT</div>', unsafe_allow_html=True)
+    st.markdown('<div class="report-title">Your market verdict is ready.</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="report-subtitle">Category: {html.escape(str(data.get("category", "Unknown")))}</div>',
+        unsafe_allow_html=True,
+    )
+
+    if not ops:
+        with st.container(border=True):
+            st.markdown(
+                '<div class="verdict-badge verdict-warn">NO DEFENSIBLE OPPORTUNITY YET</div>',
+                unsafe_allow_html=True,
+            )
+            st.write(
+                "ProductGap did not find a strong enough opportunity from the available public evidence. "
+                "That is still the result of this completed market analysis."
+            )
+            st.write(data.get("executive_summary", ""))
+
+        st.download_button(
+            "Download opportunity report ↓",
+            (report_markdown or report_text(data, mscore, ops, sources)).encode("utf-8"),
+            file_name="productgap_opportunity_report.md",
+            mime="text/markdown",
+            use_container_width=True,
+            on_click="ignore",
+            key="download_no_opportunity_report",
+        )
+        st.markdown(
+            '<div class="result-note">ProductGap uses publicly indexed evidence and does not claim to scrape every customer review.</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    best = ops[0]
+
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.markdown(
+            f'''<div class="metric-card">
+                    <div class="metric-label">ProductGap market score</div>
+                    <div class="metric-value">{mscore}<span style="font-size:18px;color:#7f8a9c">/100</span></div>
+                    <div class="metric-foot">ProductGap heuristic for this category</div>
+                </div>''',
+            unsafe_allow_html=True,
+        )
+    with m2:
+        st.markdown(
+            f'''<div class="metric-card">
+                    <div class="metric-label">Evidence</div>
+                    <div class="metric-value">{len(evdf)}</div>
+                    <div class="metric-foot">Customer / market observations</div>
+                </div>''',
+            unsafe_allow_html=True,
+        )
+    with m3:
+        st.markdown(
+            f'''<div class="metric-card">
+                    <div class="metric-label">Best opportunity</div>
+                    <div class="metric-value">{best["score"]}<span style="font-size:18px;color:#7f8a9c">/100</span></div>
+                    <div class="metric-foot">Highest-ranked product concept</div>
+                </div>''',
+            unsafe_allow_html=True,
+        )
+
+    st.write("")
+    verdict_class = "verdict-good" if best["score"] >= 60 else "verdict-warn"
+    with st.container(border=True):
+        st.markdown(
+            f'<div class="verdict-badge {verdict_class}">{html.escape(verdict(best["score"]))}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="opportunity-name">#1 {html.escape(str(best["name"]))}</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown('<div class="subtle-label">Why this opportunity exists</div>', unsafe_allow_html=True)
+        st.write(best["why"])
+
+        target_col, position_col = st.columns(2)
+        with target_col:
+            st.markdown('<div class="subtle-label">Target buyer</div>', unsafe_allow_html=True)
+            st.write(best["target"])
+        with position_col:
+            st.markdown('<div class="subtle-label">Positioning</div>', unsafe_allow_html=True)
+            st.write(best["positioning"])
+
+    t1, t2, t3 = st.tabs(["Opportunity", "Evidence", "Market"])
+
+    with t1:
+        with st.container(border=True):
+            st.markdown('<div class="subtle-label">What to change</div>', unsafe_allow_html=True)
+            for item in best["changes"]:
+                st.write("•", item)
+
+        with st.container(border=True):
+            st.markdown('<div class="subtle-label">Validate before investing</div>', unsafe_allow_html=True)
+            for item in best["tests"]:
+                st.write("•", item)
+
+        with st.container(border=True):
+            st.markdown('<div class="subtle-label">Kill the idea if…</div>', unsafe_allow_html=True)
+            for item in best["kills"]:
+                st.write("•", item)
+
+        for idx, opportunity in enumerate(ops[1:], start=2):
+            with st.expander(f"#{idx} {opportunity['name']} — {opportunity['score']}/100"):
+                st.write(opportunity["why"])
+                st.markdown(f"**Positioning:** {opportunity['positioning']}")
+
+    with t2:
+        if evdf.empty:
+            st.info("No detailed evidence trail was returned.")
+        else:
+            for theme, group in evdf.groupby("Theme"):
+                domains = len(set(d for d in group["Source domain"] if d)) if "Source domain" in group.columns else 0
+                with st.expander(f"{theme} — {len(group)} observations · {domains} source domains"):
+                    for _, row in group.iterrows():
+                        st.write(f"**{row.get('Competitor', '')}** — {row.get('Observation', '')}")
+                        if row.get("Source"):
+                            st.caption(row.get("Source"))
+
+    with t3:
+        market = data.get("market", {})
+        cols = st.columns(5)
+        labels = [
+            ("Demand", "demand_strength"),
+            ("Competition", "competition_intensity"),
+            ("Differentiation", "differentiation_room"),
+            ("Price room", "price_headroom"),
+            ("Confidence", "data_confidence"),
+        ]
+        for col, (label, key) in zip(cols, labels):
+            col.metric(label, f"{market.get(key, '?')}/5")
+
+        with st.container(border=True):
+            st.markdown('<div class="subtle-label">Market rationale</div>', unsafe_allow_html=True)
+            st.write(market.get("rationale", ""))
+            st.markdown(f"**Category:** {data.get('category', 'Unknown')}")
+
+    st.download_button(
+        "Download opportunity report ↓",
+        (report_markdown or report_text(data, mscore, ops, sources)).encode("utf-8"),
+        file_name="productgap_opportunity_report.md",
+        mime="text/markdown",
+        use_container_width=True,
+        on_click="ignore",
+        key="download_opportunity_report",
+    )
+    st.markdown(
+        '<div class="result-note">ProductGap uses publicly indexed evidence and does not claim to scrape every customer review.</div>',
+        unsafe_allow_html=True,
+    )
 
 st.markdown('<div class="pg-eyebrow">Product opportunity intelligence</div>',unsafe_allow_html=True)
 st.title("Find what your competitors missed.")
@@ -692,30 +918,111 @@ def get_analysis_credit(transaction_id):
         return None
 
 
-def claim_analysis_credit(transaction_id):
-    """Atomically consume one ProductGap analysis credit."""
+def get_analysis_run(transaction_id):
+    if not SUPABASE_URL or not SUPABASE_SECRET_KEY or not transaction_id:
+        return None
+
+    try:
+        response = requests.get(
+            f"{SUPABASE_URL.rstrip('/')}/rest/v1/analysis_runs",
+            headers=supabase_headers(),
+            params={
+                "transaction_id": f"eq.{transaction_id}",
+                "select": (
+                    "transaction_id,status,competitor_urls,result_json,report_markdown,"
+                    "attempt_count,started_at,completed_at,updated_at,last_error"
+                ),
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        rows = response.json()
+        return rows[0] if rows else None
+    except requests.RequestException as error:
+        print(f"Supabase analysis-run read failed: {type(error).__name__}")
+        return None
+    except (TypeError, ValueError, IndexError):
+        return None
+
+
+def begin_analysis_run(transaction_id, products):
+    if not SUPABASE_URL or not SUPABASE_SECRET_KEY or not transaction_id:
+        return "missing"
+
+    try:
+        response = requests.post(
+            f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/begin_analysis_run",
+            headers=supabase_headers(),
+            json={
+                "p_transaction_id": transaction_id,
+                "p_competitor_urls": products,
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        result = response.json()
+        if isinstance(result, list) and len(result) == 1:
+            result = result[0]
+        return str(result or "missing").strip('"')
+    except requests.RequestException as error:
+        print(f"Supabase analysis-run begin failed: {type(error).__name__}")
+        return "error"
+    except (TypeError, ValueError):
+        return "error"
+
+
+def complete_analysis_run(transaction_id, state, report_markdown):
+    if not SUPABASE_URL or not SUPABASE_SECRET_KEY or not transaction_id:
+        return False
+
+    payload = {
+        "p_transaction_id": transaction_id,
+        "p_result_json": state,
+        "p_report_markdown": report_markdown,
+    }
+
+    for _ in range(2):
+        try:
+            response = requests.post(
+                f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/complete_analysis_run",
+                headers=supabase_headers(),
+                json=payload,
+                timeout=12,
+            )
+            response.raise_for_status()
+            result = response.json()
+            if isinstance(result, list) and len(result) == 1:
+                result = result[0]
+            if result is True:
+                return True
+        except requests.RequestException as error:
+            print(f"Supabase analysis-run completion failed: {type(error).__name__}")
+        except (TypeError, ValueError):
+            pass
+    return False
+
+
+def fail_analysis_run(transaction_id, error_code):
     if not SUPABASE_URL or not SUPABASE_SECRET_KEY or not transaction_id:
         return False
 
     try:
         response = requests.post(
-            f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/claim_analysis_credit",
+            f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/fail_analysis_run",
             headers=supabase_headers(),
-            json={"p_transaction_id": transaction_id},
+            json={
+                "p_transaction_id": transaction_id,
+                "p_error": str(error_code)[:500],
+            },
             timeout=10,
         )
         response.raise_for_status()
         result = response.json()
-
-        # PostgREST normally returns a JSON scalar for this function,
-        # but handle a one-item list defensively as well.
         if isinstance(result, list) and len(result) == 1:
             result = result[0]
-
         return result is True
-
     except requests.RequestException as error:
-        print(f"Supabase credit claim failed: {type(error).__name__}")
+        print(f"Supabase analysis-run failure update failed: {type(error).__name__}")
         return False
     except (TypeError, ValueError):
         return False
@@ -732,6 +1039,10 @@ if "access_source" not in st.session_state:
     st.session_state.access_source = None
 if "purchase_transaction_id" not in st.session_state:
     st.session_state.purchase_transaction_id = None
+if "persisted_report_state" not in st.session_state:
+    st.session_state.persisted_report_state = None
+if "persisted_report_markdown" not in st.session_state:
+    st.session_state.persisted_report_markdown = None
 
 transaction_id = st.query_params.get("txn")
 if isinstance(transaction_id, list):
@@ -739,13 +1050,20 @@ if isinstance(transaction_id, list):
 
 used_purchase_credit = False
 
-# A verified, unused Paddle transaction is the paid entitlement.
+# A verified Paddle transaction can either unlock a fresh credit or reopen its completed report.
 if transaction_id and not st.session_state.authorized:
     if verify_paddle_transaction(transaction_id):
         if ensure_analysis_credit(transaction_id):
             credit = get_analysis_credit(transaction_id)
+            run = get_analysis_run(transaction_id)
 
-            if (
+            if run and run.get("status") == "completed" and run.get("result_json"):
+                st.session_state.authorized = True
+                st.session_state.access_source = "completed_report"
+                st.session_state.purchase_transaction_id = transaction_id
+                st.session_state.persisted_report_state = run.get("result_json")
+                st.session_state.persisted_report_markdown = run.get("report_markdown") or ""
+            elif (
                 credit
                 and credit.get("analyses_used", 0)
                 < credit.get("analyses_allowed", 0)
@@ -993,6 +1311,14 @@ if not OPENAI_API_KEY:
 
 paid_transaction_id = st.session_state.get("purchase_transaction_id")
 paid_access = st.session_state.get("access_source") == "transaction"
+completed_report_access = st.session_state.get("access_source") == "completed_report"
+
+if completed_report_access and st.session_state.get("persisted_report_state"):
+    render_report(
+        st.session_state.persisted_report_state,
+        st.session_state.get("persisted_report_markdown") or "",
+    )
+    st.stop()
 
 st.markdown('<div class="section-kicker">MARKET ANALYSIS</div>', unsafe_allow_html=True)
 st.markdown('<div class="analysis-title">Turn 3 competitor URLs into a product verdict.</div>', unsafe_allow_html=True)
@@ -1003,6 +1329,23 @@ st.markdown(
 )
 
 if paid_access:
+    current_run = get_analysis_run(paid_transaction_id)
+    if current_run and current_run.get("status") == "completed" and current_run.get("result_json"):
+        st.session_state.access_source = "completed_report"
+        st.session_state.persisted_report_state = current_run.get("result_json")
+        st.session_state.persisted_report_markdown = current_run.get("report_markdown") or ""
+        render_report(
+            st.session_state.persisted_report_state,
+            st.session_state.persisted_report_markdown,
+        )
+        st.stop()
+
+    if current_run and current_run.get("status") == "processing":
+        st.info(
+            "This purchase already has an analysis in progress. If another tab is still running, let it finish. "
+            "A stalled run can be retried automatically after about 20 minutes."
+        )
+
     st.markdown(
         '<div class="credit-pill">✓ 1 paid analysis credit ready</div>',
         unsafe_allow_html=True,
@@ -1019,7 +1362,7 @@ with st.form("form"):
     u3 = st.text_input("03  Competitor 3 URL", placeholder="https://...")
 
     st.markdown(
-        '<div class="form-note">Tip: use exact product pages, not search-result or category pages.</div>',
+        '<div class="form-note">Tip: use three distinct exact product pages, not search-result or category pages.</div>',
         unsafe_allow_html=True,
     )
 
@@ -1039,23 +1382,53 @@ if submitted:
         st.error("Enter 3 valid http/https product URLs.")
         st.stop()
 
+    normalized_products = [normalize_url(url) for url in products]
+    if len(set(normalized_products)) != 3:
+        st.error("Use three different competitor product URLs.")
+        st.stop()
+
     if not agree:
         st.error("Please confirm the research limitation.")
         st.stop()
 
-    # Block a second analysis before spending another OpenAI request.
     if paid_access:
-        credit = get_analysis_credit(paid_transaction_id)
-        if not credit:
-            st.error("ProductGap could not load your analysis credit.")
+        run_status = begin_analysis_run(paid_transaction_id, products)
+
+        if run_status == "completed":
+            run = get_analysis_run(paid_transaction_id)
+            if run and run.get("result_json"):
+                st.session_state.access_source = "completed_report"
+                st.session_state.persisted_report_state = run.get("result_json")
+                st.session_state.persisted_report_markdown = run.get("report_markdown") or ""
+                render_report(
+                    st.session_state.persisted_report_state,
+                    st.session_state.persisted_report_markdown,
+                )
+                st.stop()
+
+        if run_status == "busy":
+            st.info(
+                "This purchase already has an analysis running in another tab. "
+                "Wait for it to finish, then refresh this page."
+            )
+            st.stop()
+
+        if run_status == "attempt_limit":
+            st.error(
+                "This purchase has reached the retry limit without a completed analysis. "
+                "Please contact support so we can review it without charging you again."
+            )
             show_support_hint()
             st.stop()
 
-        if credit.get("analyses_used", 0) >= credit.get("analyses_allowed", 0):
-            st.error(
-                "This purchase's analysis credit has already been used. "
-                "Purchase another analysis to research a new market."
-            )
+        if run_status in {"used", "missing", "error"}:
+            st.error("ProductGap could not reserve this analysis credit. Please try again or contact support.")
+            show_support_hint()
+            st.stop()
+
+        if run_status != "started":
+            st.error("ProductGap could not start this analysis.")
+            show_support_hint()
             st.stop()
 
     with st.status("Researching public customer evidence…", expanded=True) as s:
@@ -1067,175 +1440,45 @@ if submitted:
             data, sources = run_research(products)
         except Exception as error:
             print(f"Research failed: {type(error).__name__}")
+            if paid_access:
+                fail_analysis_run(paid_transaction_id, f"research_error:{type(error).__name__}")
             s.update(label="Research failed", state="error")
-            st.error("The analysis could not be completed. Please try again later.")
+            st.error(
+                "The analysis could not be completed. Your paid credit was not consumed. "
+                "You can retry this purchase."
+            )
             show_support_hint()
             st.stop()
 
         if not data.get("input_valid", True):
+            if paid_access:
+                fail_analysis_run(paid_transaction_id, "products_not_comparable")
             s.update(label="Products are not comparable", state="error")
             st.error(data.get("input_error", "These products are not comparable."))
+            if paid_access:
+                st.caption("This attempt did not consume your analysis credit. A maximum of 3 attempts is allowed per purchase.")
             st.stop()
 
-        # Only consume the paid credit after ProductGap has completed a valid
-        # research run. Access-code sessions intentionally bypass paid credits.
+        evdf = evidence_table(data, sources)
+        mscore = market_score(data.get("market", {}))
+        ops = ranked_ops(data, evdf, mscore)
+        report_markdown = report_text(data, mscore, ops, sources)
+        state = build_report_state(data, sources, evdf, mscore, ops)
+
         if paid_access:
-            if not claim_analysis_credit(paid_transaction_id):
-                s.update(label="Analysis credit unavailable", state="error")
+            if not complete_analysis_run(paid_transaction_id, state, report_markdown):
+                s.update(label="Could not save report", state="error")
                 st.error(
-                    "This analysis credit has already been used or could not be claimed."
+                    "ProductGap finished the research but could not safely save your report. "
+                    "Please contact support before retrying."
                 )
                 show_support_hint()
                 st.stop()
 
+            st.session_state.access_source = "completed_report"
+            st.session_state.persisted_report_state = state
+            st.session_state.persisted_report_markdown = report_markdown
+
         s.update(label="Opportunity report ready", state="complete")
 
-    evdf = evidence_table(data, sources)
-    mscore = market_score(data.get("market", {}))
-    ops = ranked_ops(data, evdf, mscore)
-
-    st.markdown('<div class="section-kicker">OPPORTUNITY REPORT</div>', unsafe_allow_html=True)
-    st.markdown('<div class="report-title">Your market verdict is ready.</div>', unsafe_allow_html=True)
-    st.markdown(
-        f'<div class="report-subtitle">Category: {html.escape(str(data.get("category", "Unknown")))}</div>',
-        unsafe_allow_html=True,
-    )
-
-    if not ops:
-        with st.container(border=True):
-            st.markdown(
-                '<div class="verdict-badge verdict-warn">NO DEFENSIBLE OPPORTUNITY YET</div>',
-                unsafe_allow_html=True,
-            )
-            st.write(
-                "ProductGap did not find a strong enough opportunity from the available public evidence. "
-                "That is still the result of this completed market analysis."
-            )
-            st.write(data.get("executive_summary", ""))
-        st.stop()
-
-    best = ops[0]
-
-    m1, m2, m3 = st.columns(3)
-    with m1:
-        st.markdown(
-            f'''<div class="metric-card">
-                    <div class="metric-label">Market score</div>
-                    <div class="metric-value">{mscore}<span style="font-size:18px;color:#7f8a9c">/100</span></div>
-                    <div class="metric-foot">Overall category attractiveness</div>
-                </div>''',
-            unsafe_allow_html=True,
-        )
-    with m2:
-        st.markdown(
-            f'''<div class="metric-card">
-                    <div class="metric-label">Evidence</div>
-                    <div class="metric-value">{len(evdf)}</div>
-                    <div class="metric-foot">Customer / market observations</div>
-                </div>''',
-            unsafe_allow_html=True,
-        )
-    with m3:
-        st.markdown(
-            f'''<div class="metric-card">
-                    <div class="metric-label">Best opportunity</div>
-                    <div class="metric-value">{best["score"]}<span style="font-size:18px;color:#7f8a9c">/100</span></div>
-                    <div class="metric-foot">Highest-ranked product concept</div>
-                </div>''',
-            unsafe_allow_html=True,
-        )
-
-    st.write("")
-    verdict_class = "verdict-good" if best["score"] >= 60 else "verdict-warn"
-    with st.container(border=True):
-        st.markdown(
-            f'<div class="verdict-badge {verdict_class}">{html.escape(verdict(best["score"]))}</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f'<div class="opportunity-name">#1 {html.escape(str(best["name"]))}</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown('<div class="subtle-label">Why this opportunity exists</div>', unsafe_allow_html=True)
-        st.write(best["why"])
-
-        target_col, position_col = st.columns(2)
-        with target_col:
-            st.markdown('<div class="subtle-label">Target buyer</div>', unsafe_allow_html=True)
-            st.write(best["target"])
-        with position_col:
-            st.markdown('<div class="subtle-label">Positioning</div>', unsafe_allow_html=True)
-            st.write(best["positioning"])
-
-    t1, t2, t3 = st.tabs(["Opportunity", "Evidence", "Market"])
-
-    with t1:
-        with st.container(border=True):
-            st.markdown('<div class="subtle-label">What to change</div>', unsafe_allow_html=True)
-            for item in best["changes"]:
-                st.write("•", item)
-
-        with st.container(border=True):
-            st.markdown('<div class="subtle-label">Validate before investing</div>', unsafe_allow_html=True)
-            for item in best["tests"]:
-                st.write("•", item)
-
-        with st.container(border=True):
-            st.markdown('<div class="subtle-label">Kill the idea if…</div>', unsafe_allow_html=True)
-            for item in best["kills"]:
-                st.write("•", item)
-
-        for i, opportunity in enumerate(ops[1:], start=2):
-            with st.expander(
-                f"#{i} {opportunity['name']} — {opportunity['score']}/100"
-            ):
-                st.write(opportunity["why"])
-                st.markdown(f"**Positioning:** {opportunity['positioning']}")
-
-    with t2:
-        if evdf.empty:
-            st.info("No detailed evidence trail was returned.")
-        else:
-            for theme, group in evdf.groupby("Theme"):
-                domains = len(set(d for d in group["Source domain"] if d))
-                with st.expander(
-                    f"{theme} — {len(group)} observations · {domains} source domains"
-                ):
-                    for _, row in group.iterrows():
-                        st.write(f"**{row['Competitor']}** — {row['Observation']}")
-                        if row["Source"]:
-                            st.caption(row["Source"])
-
-    with t3:
-        market = data.get("market", {})
-        cols = st.columns(5)
-        labels = [
-            ("Demand", "demand_strength"),
-            ("Competition", "competition_intensity"),
-            ("Differentiation", "differentiation_room"),
-            ("Price room", "price_headroom"),
-            ("Confidence", "data_confidence"),
-        ]
-
-        for col, (label, key) in zip(cols, labels):
-            col.metric(label, f"{market.get(key, '?')}/5")
-
-        with st.container(border=True):
-            st.markdown('<div class="subtle-label">Market rationale</div>', unsafe_allow_html=True)
-            st.write(market.get("rationale", ""))
-            st.markdown(f"**Category:** {data.get('category', 'Unknown')}")
-
-    report = report_text(data, mscore, ops, sources)
-    st.download_button(
-        "Download opportunity report ↓",
-        report.encode("utf-8"),
-        file_name="productgap_opportunity_report.md",
-        mime="text/markdown",
-        use_container_width=True,
-        on_click="ignore",
-    )
-    st.markdown(
-        '<div class="result-note">ProductGap uses publicly indexed evidence and does not claim to scrape every customer review.</div>',
-        unsafe_allow_html=True,
-    )
+    render_report(state, report_markdown)
