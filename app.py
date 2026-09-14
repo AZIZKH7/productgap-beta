@@ -6,7 +6,7 @@ from urllib.parse import urlparse, urlunparse
 import pandas as pd
 import streamlit as st
 import requests
-
+import streamlit.components.v1 as components
 st.set_page_config(page_title="ProductGap — Find What Competitors Miss", page_icon="◈", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
