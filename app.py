@@ -520,13 +520,12 @@ if not st.session_state.authorized:
         """,
         unsafe_allow_html=True
     )
-
     with st.container(border=True):
 
-        left, right = st.columns([1.55, 1], gap="large")
+        spacer_left, main, spacer_right = st.columns([0.12, 1, 0.12])
 
-        with left:
-            st.subheader("Find the opportunity your competitors missed.")
+        with main:
+            st.markdown("## Find the opportunity your competitors missed.")
 
             st.write(
                 "Paste 3 competing products and get an evidence-backed market report "
@@ -567,29 +566,26 @@ if not st.session_state.authorized:
                 unsafe_allow_html=True
             )
 
-        with right:
-            st.markdown("### Have an access code?")
+            with st.expander("Already purchased or have an access code?"):
 
-            st.caption("Enter your access code below to continue.")
+                code = st.text_input(
+                    "Access code",
+                    type="password",
+                    placeholder="Enter access code"
+                )
 
-            code = st.text_input(
-                "Access code",
-                type="password",
-                label_visibility="collapsed",
-                placeholder="Enter access code"
-            )
-
-            if st.button(
-                "Use access code",
-                use_container_width=True
-            ):
-                if code == BETA_ACCESS_CODE:
-                    st.session_state.authorized = True
-                    st.rerun()
-                else:
-                    st.error("That access code is not valid.")
+                if st.button(
+                    "Use access code",
+                    use_container_width=True
+                ):
+                    if code == BETA_ACCESS_CODE:
+                        st.session_state.authorized = True
+                        st.rerun()
+                    else:
+                        st.error("That access code is not valid.")
 
     st.stop()
+    
 if not OPENAI_API_KEY:
     st.error("ProductGap is not configured. Add OPENAI_API_KEY to the server secrets.")
     st.stop()
