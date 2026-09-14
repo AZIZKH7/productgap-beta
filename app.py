@@ -1462,59 +1462,89 @@ if isinstance(transaction_id, list):
 
 used_purchase_credit = False
 
-# A verified Paddle transaction can either unlock a fresh credit or reopen its completed report.
-if transaction_id and not st.session_state.authorized:
-    if verify_paddle_transaction(transaction_id):
-        if ensure_analysis_credit(transaction_id):
-            credit = get_analysis_credit(transaction_id)
-            run = get_analysis_run(transaction_id)
+# Prefer an existing server-side entitlement created by our signed Paddle webhook.
+# This is important for refunds/chargebacks and for Paddle simulation events, which
+# may not be retrievable through the ordinary Transactions API. Browser-side Paddle
+# verification remains as a fallback only when Supabase does not already know the
+# transaction.
+def apply_known_entitlement(transaction_id, credit, run):
+    if not credit:
+        return "missing"
 
-            if credit and credit.get("entitlement_status", "active") == "revoked":
-                used_purchase_credit = True
-                st.markdown(
-                    """
-                    <div class="used-credit-notice">
-                        <strong>Purchase access is no longer active.</strong> This payment was refunded, credited, or charged back.
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            elif run and run.get("status") == "completed" and run.get("result_json"):
-                st.session_state.authorized = True
-                st.session_state.access_source = "completed_report"
-                st.session_state.purchase_transaction_id = transaction_id
-                st.session_state.persisted_report_state = run.get("result_json")
-                st.session_state.persisted_report_markdown = run.get("report_markdown") or ""
-            elif (
-                credit
-                and credit.get("entitlement_status", "active") == "active"
-                and credit.get("analyses_used", 0)
-                < credit.get("analyses_allowed", 0)
-            ):
-                st.session_state.authorized = True
-                st.session_state.access_source = "transaction"
-                st.session_state.purchase_transaction_id = transaction_id
-            elif credit:
-                used_purchase_credit = True
-                st.markdown(
-                    """
-                    <div class="used-credit-notice">
-                        <strong>Analysis completed.</strong> This purchase's one ProductGap analysis credit has already been used.
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+    # Never trust a row that belongs to another ProductGap price/environment.
+    if credit.get("price_id") != PADDLE_PRICE_ID:
+        return "mismatch"
+    if credit.get("paddle_environment") != PADDLE_ENVIRONMENT:
+        return "mismatch"
+
+    if credit.get("entitlement_status", "active") == "revoked":
+        return "revoked"
+
+    if run and run.get("status") == "completed" and run.get("result_json"):
+        st.session_state.authorized = True
+        st.session_state.access_source = "completed_report"
+        st.session_state.purchase_transaction_id = transaction_id
+        st.session_state.persisted_report_state = run.get("result_json")
+        st.session_state.persisted_report_markdown = run.get("report_markdown") or ""
+        return "completed"
+
+    if (
+        credit.get("entitlement_status", "active") == "active"
+        and credit.get("analyses_used", 0) < credit.get("analyses_allowed", 0)
+    ):
+        st.session_state.authorized = True
+        st.session_state.access_source = "transaction"
+        st.session_state.purchase_transaction_id = transaction_id
+        return "unused"
+
+    return "used"
+
+
+if transaction_id and not st.session_state.authorized:
+    credit = get_analysis_credit(transaction_id)
+    run = get_analysis_run(transaction_id) if credit else None
+    entitlement_state = apply_known_entitlement(transaction_id, credit, run)
+
+    if entitlement_state == "missing":
+        # Fallback for the short window before transaction.completed reaches the
+        # webhook, or for an older beta purchase that predates webhook provisioning.
+        if verify_paddle_transaction(transaction_id):
+            if ensure_analysis_credit(transaction_id):
+                credit = get_analysis_credit(transaction_id)
+                run = get_analysis_run(transaction_id) if credit else None
+                entitlement_state = apply_known_entitlement(transaction_id, credit, run)
             else:
-                st.error(
-                    "Your payment was verified, but ProductGap could not load the analysis credit."
-                )
-                show_support_hint()
+                entitlement_state = "create_error"
         else:
-            st.error(
-                "Your payment was verified, but ProductGap could not create the analysis credit."
-            )
-            show_support_hint()
-    else:
+            entitlement_state = "verify_error"
+
+    if entitlement_state == "revoked":
+        used_purchase_credit = True
+        st.markdown(
+            """
+            <div class="used-credit-notice">
+                <strong>Purchase access is no longer active.</strong> This payment was refunded, credited, or charged back.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    elif entitlement_state == "used":
+        used_purchase_credit = True
+        st.markdown(
+            """
+            <div class="used-credit-notice">
+                <strong>Analysis completed.</strong> This purchase's one ProductGap analysis credit has already been used.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    elif entitlement_state == "mismatch":
+        st.error("This transaction does not match the configured ProductGap product or environment.")
+        show_support_hint()
+    elif entitlement_state == "create_error":
+        st.error("Your payment was verified, but ProductGap could not create the analysis credit.")
+        show_support_hint()
+    elif entitlement_state == "verify_error":
         st.error(
             "ProductGap could not verify this Paddle transaction yet. "
             "If you just completed checkout, refresh this page once."
