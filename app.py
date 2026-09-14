@@ -656,7 +656,7 @@ if not st.session_state.authorized:
         spacer_left, main, spacer_right = st.columns([0.12, 1, 0.12])
 
         with main:
-            st.markdown("## Find the opportunity your competitors missed.")
+        st.markdown("## Find the opportunity your competitors missed.")
 
             st.write(
                 "Paste 3 competing products and get an evidence-backed market report "
@@ -682,7 +682,7 @@ if not st.session_state.authorized:
                 unsafe_allow_html=True
             )
 
-           st.link_button(
+        st.link_button(
                 f"Analyze my market — {PRODUCT_PRICE} →",
                 f"{APP_URL}/?checkout=1",
                 use_container_width=True
