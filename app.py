@@ -398,17 +398,10 @@ if BETA_ACCESS_CODE:
     # Verify real Paddle transaction
     transaction_id = st.query_params.get("txn")
 
-    if transaction_id:
-        if verify_paddle_transaction(transaction_id):
-            st.session_state.authorized = True
-            st.query_params.clear()
-            st.rerun()
-
-
+if transaction_id:
+    if verify_paddle_transaction(transaction_id):
+        st.session_state.authorized = True
    
-
-
-    
 
     if not st.session_state.authorized and checkout_mode:
         st.subheader("ProductGap — Founding Beta")
