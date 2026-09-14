@@ -1309,6 +1309,10 @@ def get_analysis_credit(transaction_id):
                     "paddle_environment,"
                     "analyses_allowed,"
                     "analyses_used,"
+                    "entitlement_status,"
+                    "revoked_at,"
+                    "revocation_reason,"
+                    "last_paddle_event_at,"
                     "created_at,"
                     "used_at"
                 ),
@@ -1465,7 +1469,17 @@ if transaction_id and not st.session_state.authorized:
             credit = get_analysis_credit(transaction_id)
             run = get_analysis_run(transaction_id)
 
-            if run and run.get("status") == "completed" and run.get("result_json"):
+            if credit and credit.get("entitlement_status", "active") == "revoked":
+                used_purchase_credit = True
+                st.markdown(
+                    """
+                    <div class="used-credit-notice">
+                        <strong>Purchase access is no longer active.</strong> This payment was refunded, credited, or charged back.
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            elif run and run.get("status") == "completed" and run.get("result_json"):
                 st.session_state.authorized = True
                 st.session_state.access_source = "completed_report"
                 st.session_state.purchase_transaction_id = transaction_id
@@ -1473,6 +1487,7 @@ if transaction_id and not st.session_state.authorized:
                 st.session_state.persisted_report_markdown = run.get("report_markdown") or ""
             elif (
                 credit
+                and credit.get("entitlement_status", "active") == "active"
                 and credit.get("analyses_used", 0)
                 < credit.get("analyses_allowed", 0)
             ):
@@ -1721,6 +1736,22 @@ paid_transaction_id = st.session_state.get("purchase_transaction_id")
 paid_access = st.session_state.get("access_source") == "transaction"
 completed_report_access = st.session_state.get("access_source") == "completed_report"
 
+# Re-check server-side entitlement on every paid/report view so a refund or
+# chargeback can revoke access even if the customer still has an old browser session.
+if paid_transaction_id and (paid_access or completed_report_access):
+    live_credit = get_analysis_credit(paid_transaction_id)
+    if live_credit and live_credit.get("entitlement_status", "active") == "revoked":
+        st.session_state.authorized = False
+        st.session_state.access_source = None
+        st.session_state.purchase_transaction_id = None
+        st.session_state.persisted_report_state = None
+        st.session_state.persisted_report_markdown = None
+        st.error(
+            "This purchase is no longer active because Paddle recorded a refund, credit, or chargeback."
+        )
+        show_support_hint()
+        st.stop()
+
 if completed_report_access and st.session_state.get("persisted_report_state"):
     render_report(
         st.session_state.persisted_report_state,
@@ -1825,6 +1856,13 @@ if submitted:
             st.error(
                 "This purchase has reached the retry limit without a completed analysis. "
                 "Please contact support so we can review it without charging you again."
+            )
+            show_support_hint()
+            st.stop()
+
+        if run_status == "revoked":
+            st.error(
+                "This purchase is no longer active because Paddle recorded a refund, credit, or chargeback."
             )
             show_support_hint()
             st.stop()
