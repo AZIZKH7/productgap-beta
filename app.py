@@ -103,6 +103,34 @@ h1 {font-size: 3.1rem !important; letter-spacing: -0.045em;}
 .stHeading a {
     display: none !important;
 }
+/* ProductGap primary checkout button */
+
+.stButton button[kind="primary"] {
+    background: linear-gradient(
+        135deg,
+        #7357ff 0%,
+        #4d7cff 55%,
+        #2997ff 100%
+    ) !important;
+
+    color: white !important;
+    border: 0 !important;
+    border-radius: 14px !important;
+    min-height: 54px;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+
+    box-shadow:
+        0 12px 30px rgba(73,92,255,0.30);
+
+    transition: all 0.18s ease;
+}
+
+.stButton button[kind="primary"]:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        0 16px 40px rgba(73,92,255,0.42);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -653,11 +681,14 @@ if not st.session_state.authorized:
                 unsafe_allow_html=True
             )
 
-            st.link_button(
+            if st.button(
                 f"Analyze my market — {PRODUCT_PRICE} →",
-                f"{APP_URL}/?checkout=1",
-                use_container_width=True
-            )
+                type="primary",
+                use_container_width=True,
+                key="start_checkout"
+            ):
+                st.query_params["checkout"] = "1"
+                st.rerun()
 
             st.markdown(
                 """
