@@ -99,6 +99,10 @@ h1 {font-size: 3.1rem !important; letter-spacing: -0.045em;}
     min-height: 50px;
     border-radius: 14px !important;
 }
+/* Hide Streamlit heading anchor/link icons */
+.stHeading a {
+    display: none !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -515,7 +519,7 @@ if not st.session_state.authorized:
     st.markdown(
         """
         <div class="offer-kicker">
-            PRODUCTGAP EARLY ACCESS
+            PRODUCT OPPORTUNITY ANALYSIS
         </div>
         """,
         unsafe_allow_html=True
@@ -560,7 +564,7 @@ if not st.session_state.authorized:
             st.markdown(
                 """
                 <div class="trust-line">
-                    Secure checkout powered by Paddle
+                    🔒 Secure one-time checkout powered by Paddle
                 </div>
                 """,
                 unsafe_allow_html=True
