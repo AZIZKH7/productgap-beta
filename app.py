@@ -5,6 +5,7 @@ import json
 from urllib.parse import urlparse, urlunparse
 import pandas as pd
 import streamlit as st
+import requests
 
 st.set_page_config(page_title="ProductGap — Find What Competitors Miss", page_icon="◈", layout="wide", initial_sidebar_state="collapsed")
 
@@ -36,6 +37,8 @@ SUPPORT_EMAIL = secret("SUPPORT_EMAIL", "")
 PRODUCT_PRICE = secret("PRODUCT_PRICE", "$9")
 MODEL = secret("PRODUCTGAP_MODEL", "gpt-5.6-luna")
 PADDLE_RETURN_TOKEN = secret("PADDLE_RETURN_TOKEN")
+PADDLE_API_KEY = secret("PADDLE_API_KEY")
+PADDLE_PRICE_ID = secret("PADDLE_PRICE_ID")
 
 SOURCE_QUALITY = {
     "retailer_review":1.0, "marketplace_review":1.0, "professional_review":0.82,
@@ -271,7 +274,39 @@ if "authorized" not in st.session_state:
     st.session_state.authorized = False
 
 paid_token = st.query_params.get("paid")
+def verify_paddle_transaction(transaction_id):
+    if not PADDLE_API_KEY or not PADDLE_PRICE_ID:
+        return False
 
+    if not transaction_id or not transaction_id.startswith("txn_"):
+        return False
+
+    try:
+        response = requests.get(
+            f"https://sandbox-api.paddle.com/transactions/{transaction_id}",
+            headers={
+                "Authorization": f"Bearer {PADDLE_API_KEY}",
+            },
+            timeout=10,
+        )
+
+        response.raise_for_status()
+        transaction = response.json().get("data", {})
+
+        # Paddle may briefly report "paid" before internal processing
+        if transaction.get("status") not in {"paid", "completed"}:
+            return False
+
+        purchased_price_ids = {
+            item.get("price", {}).get("id")
+            for item in transaction.get("items", [])
+        }
+
+        return PADDLE_PRICE_ID in purchased_price_ids
+
+    except Exception:
+        return False
+        
 if BETA_ACCESS_CODE:
     if "authorized" not in st.session_state:
         st.session_state.authorized = False
