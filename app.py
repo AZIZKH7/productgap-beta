@@ -510,7 +510,7 @@ if BETA_ACCESS_CODE:
         )
 
         st.stop()
-    if not st.session_state.authorized:
+if not st.session_state.authorized:
 
     st.markdown(
         """
@@ -570,9 +570,7 @@ if BETA_ACCESS_CODE:
         with right:
             st.markdown("### Have an access code?")
 
-            st.caption(
-                "Enter your access code below to continue."
-            )
+            st.caption("Enter your access code below to continue.")
 
             code = st.text_input(
                 "Access code",
