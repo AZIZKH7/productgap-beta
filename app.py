@@ -131,43 +131,7 @@ h1 {font-size: 3.1rem !important; letter-spacing: -0.045em;}
     box-shadow:
         0 16px 40px rgba(73,92,255,0.42);
 }
-.productgap-cta {
-    display: flex;
-    align-items: center;
-    justify-content: center;
 
-    width: 100%;
-    min-height: 54px;
-
-    box-sizing: border-box;
-
-    background: linear-gradient(
-        135deg,
-        #7357ff 0%,
-        #4d7cff 55%,
-        #2997ff 100%
-    );
-
-    color: white !important;
-    text-decoration: none !important;
-
-    border-radius: 14px;
-
-    font-size: 16px;
-    font-weight: 700;
-
-    box-shadow: 0 12px 30px rgba(73, 92, 255, 0.30);
-
-    transition:
-        transform 0.18s ease,
-        box-shadow 0.18s ease;
-}
-
-.productgap-cta:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 16px 40px rgba(73, 92, 255, 0.42);
-    color: white !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -718,17 +682,10 @@ if not st.session_state.authorized:
                 unsafe_allow_html=True
             )
 
-            st.markdown(
-                f"""
-                <a
-                    href="?checkout=1"
-                    target="_self"
-                    class="productgap-cta"
-                >
-                    Analyze my market — {PRODUCT_PRICE} →
-                </a>
-                """,
-                unsafe_allow_html=True
+           st.link_button(
+                f"Analyze my market — {PRODUCT_PRICE} →",
+                f"{APP_URL}/?checkout=1",
+                use_container_width=True
             )
 
             st.markdown(
