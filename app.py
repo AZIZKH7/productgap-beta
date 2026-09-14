@@ -41,8 +41,6 @@ PADDLE_API_KEY = secret("PADDLE_API_KEY")
 PADDLE_PRICE_ID = secret("PADDLE_PRICE_ID")
 PADDLE_CLIENT_TOKEN = secret("PADDLE_CLIENT_TOKEN")
 APP_URL = secret("APP_URL", "https://marketgap-ai.streamlit.app")
-if "authorized" not in st.session_state:
-    st.session_state.authorized = False
 
 checkout_mode = st.query_params.get("checkout") == "1"
 SOURCE_QUALITY = {
@@ -313,8 +311,19 @@ def verify_paddle_transaction(transaction_id):
         return False
         
 if BETA_ACCESS_CODE:
-    
-    # Unlock after successful Paddle sandbox redirect
+    if "authorized" not in st.session_state:
+        st.session_state.authorized = False
+
+    # Verify real Paddle transaction
+    transaction_id = st.query_params.get("txn")
+
+    if transaction_id:
+        if verify_paddle_transaction(transaction_id):
+            st.session_state.authorized = True
+            st.query_params.clear()
+            st.rerun()
+
+    # Old temporary sandbox return-token method
     paid_token = st.query_params.get("paid")
 
     if PADDLE_RETURN_TOKEN and paid_token == PADDLE_RETURN_TOKEN:
