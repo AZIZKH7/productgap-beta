@@ -314,12 +314,10 @@ with right:
         type="primary",
         use_container_width=True,
     ):
-        # Keep your existing access-code validation here.
-        pass
-                if code==BETA_ACCESS_CODE:
+        if code==BETA_ACCESS_CODE:
                     st.session_state.authorized=True; 
                     st.rerun()
-                else: 
+        else: 
                     st.error("That access code is not valid.")
         st.stop()
 
