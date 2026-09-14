@@ -21,6 +21,84 @@ h1 {font-size: 3.1rem !important; letter-spacing: -0.045em;}
 .pg-eyebrow {font-size:.78rem; letter-spacing:.13em; font-weight:700; text-transform:uppercase; color:#8d96a5;}
 .pg-good {padding:14px 16px; border-radius:12px; background:rgba(46,160,94,.13); border:1px solid rgba(46,160,94,.28);}
 .pg-warn {padding:14px 16px; border-radius:12px; background:rgba(230,166,30,.10); border:1px solid rgba(230,166,30,.25);}
+/* Premium ProductGap checkout */
+
+.offer-kicker {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 12px;
+    margin-bottom: 14px;
+    border-radius: 999px;
+    background: rgba(115,87,255,0.11);
+    border: 1px solid rgba(115,87,255,0.28);
+    color: #a99aff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+}
+
+.offer-price {
+    font-size: 44px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin-top: 14px;
+}
+
+.offer-price-note {
+    color: #8e96a7;
+    font-size: 13px;
+    margin-bottom: 20px;
+}
+
+.benefit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 20px 0 24px 0;
+}
+
+.benefit {
+    padding: 12px 13px;
+    background: rgba(255,255,255,0.035);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    color: #d8dce6;
+    font-size: 13px;
+}
+
+.trust-line {
+    color: #7f8798;
+    font-size: 12px;
+    text-align: center;
+    margin-top: 10px;
+}
+
+[data-testid="stLinkButton"] > a {
+    background: linear-gradient(
+        135deg,
+        #7357ff 0%,
+        #4d7cff 55%,
+        #2997ff 100%
+    ) !important;
+    color: white !important;
+    border: 0 !important;
+    border-radius: 14px !important;
+    min-height: 54px;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 12px 30px rgba(73,92,255,0.30);
+    transition: all 0.18s ease;
+}
+
+[data-testid="stLinkButton"] > a:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 40px rgba(73,92,255,0.42);
+}
+
+[data-testid="stButton"] > button {
+    min-height: 50px;
+    border-radius: 14px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -433,36 +511,79 @@ if BETA_ACCESS_CODE:
 
         st.stop()
     if not st.session_state.authorized:
-        left, right = st.columns([1.4, 1])
+
+    st.markdown(
+        """
+        <div class="offer-kicker">
+            PRODUCTGAP EARLY ACCESS
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    with st.container(border=True):
+
+        left, right = st.columns([1.55, 1], gap="large")
 
         with left:
-            st.subheader(f"Founding Beta — {PRODUCT_PRICE}")
+            st.subheader("Find the opportunity your competitors missed.")
+
             st.write(
-                "One full market analysis with ranked product opportunities, "
-                "evidence, validation tests and a downloadable report."
+                "Paste 3 competing products and get an evidence-backed market report "
+                "built from public customer complaints, unmet needs and competitive signals."
+            )
+
+            st.markdown(
+                f"""
+                <div class="offer-price">{PRODUCT_PRICE}</div>
+                <div class="offer-price-note">
+                    One-time purchase • No subscription
+                </div>
+
+                <div class="benefit-grid">
+                    <div class="benefit">✓ Customer pain signals</div>
+                    <div class="benefit">✓ Ranked opportunities</div>
+                    <div class="benefit">✓ Positioning ideas</div>
+                    <div class="benefit">✓ Validation tests</div>
+                    <div class="benefit">✓ Kill conditions</div>
+                    <div class="benefit">✓ Downloadable report</div>
+                </div>
+                """,
+                unsafe_allow_html=True
             )
 
             st.link_button(
-                f"Get beta access — {PRODUCT_PRICE}",
+                f"Analyze my market — {PRODUCT_PRICE} →",
                 f"{APP_URL}/?checkout=1",
                 use_container_width=True
             )
 
-            
+            st.markdown(
+                """
+                <div class="trust-line">
+                    Secure checkout powered by Paddle
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
         with right:
-            st.subheader("Already have access?")
+            st.markdown("### Have an access code?")
+
+            st.caption(
+                "Enter your access code below to continue."
+            )
 
             code = st.text_input(
                 "Access code",
                 type="password",
                 label_visibility="collapsed",
-                placeholder="Enter beta access code",
+                placeholder="Enter access code"
             )
 
             if st.button(
-                "Unlock ProductGap",
-                type="primary",
-                use_container_width=True,
+                "Use access code",
+                use_container_width=True
             ):
                 if code == BETA_ACCESS_CODE:
                     st.session_state.authorized = True
@@ -470,8 +591,7 @@ if BETA_ACCESS_CODE:
                 else:
                     st.error("That access code is not valid.")
 
-        st.stop()
-
+    st.stop()
 if not OPENAI_API_KEY:
     st.error("ProductGap is not configured. Add OPENAI_API_KEY to the server secrets.")
     st.stop()
