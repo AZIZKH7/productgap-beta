@@ -328,88 +328,98 @@ if BETA_ACCESS_CODE:
         st.subheader("ProductGap — Founding Beta")
         st.caption("Secure $9 test checkout powered by Paddle.")
 
-        checkout_html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
-        </head>
+       checkout_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+</head>
 
-        <body>
-            <div class="checkout-container"></div>
+<body style="margin:0; background:#0e1117;">
+    <div class="checkout-container"></div>
 
-            <script>
-                Paddle.Environment.set("sandbox");
+    <script>
+        Paddle.Environment.set("sandbox");
 
-                Paddle.Initialize({{
-                    token: "{PADDLE_CLIENT_TOKEN}",
+        Paddle.Initialize({{
+            token: "{PADDLE_CLIENT_TOKEN}",
 
-                    checkout: {{
-                        settings: {{
-                            displayMode: "inline",
-                            frameTarget: "checkout-container",
-                            frameInitialHeight: "450",
-                            frameStyle: "width: 100%; min-width: 312px; background-color: transparent; border: none;",
-                            variant: "one-page"
-                        }}
-                    }},
+            checkout: {{
+                settings: {{
+                    displayMode: "inline",
+                    frameTarget: "checkout-container",
+                    frameInitialHeight: "450",
+                    frameStyle: "width: 100%; min-width: 312px; background-color: transparent; border: none;",
+                    variant: "one-page"
+                }}
+            }},
 
-                    eventCallback: function(event) {
-    if (event.name === "checkout.completed") {
-        const transactionId = event.data.transaction_id;
-        const continueUrl =
-            "{APP_URL}/?txn=" +
-            encodeURIComponent(transactionId);
+            eventCallback: function(event) {{
+                if (event.name === "checkout.completed") {{
+                    const transactionId = event.data.transaction_id;
 
-        document.body.innerHTML = `
-            <div style="
-                font-family: Arial, sans-serif;
-                text-align: center;
-                padding: 60px 20px;
-                color: white;
-                background: #0e1117;
-                min-height: 450px;
-            ">
-                <div style="font-size:64px; margin-bottom:20px;">✓</div>
-                <h2>Payment successful</h2>
-                <p style="color:#aaa; margin-bottom:30px;">
-                    Your ProductGap access is ready.
-                </p>
+                    const continueUrl =
+                        "{APP_URL}/?txn=" +
+                        encodeURIComponent(transactionId);
 
-                <a
-                    href="${continueUrl}"
-                    target="_blank"
-                    style="
-                        display:inline-block;
-                        padding:14px 28px;
-                        background:#ff4b4b;
-                        color:white;
-                        text-decoration:none;
-                        border-radius:8px;
-                        font-weight:600;
-                    "
-                >
-                    Continue to ProductGap
-                </a>
-            </div>
-        `;
-    }
-}
-                    }}
-                }});
+                    document.body.innerHTML = `
+                        <div style="
+                            font-family: Arial, sans-serif;
+                            text-align: center;
+                            padding: 60px 20px;
+                            color: white;
+                            background: #0e1117;
+                            min-height: 450px;
+                        ">
+                            <div style="
+                                font-size: 64px;
+                                margin-bottom: 20px;
+                            ">
+                                ✓
+                            </div>
 
-                Paddle.Checkout.open({{
-                    items: [
-                        {{
-                            priceId: "{PADDLE_PRICE_ID}",
-                            quantity: 1
-                        }}
-                    ]
-                }});
-            </script>
-        </body>
-        </html>
-        """
+                            <h2>Payment successful</h2>
+
+                            <p style="
+                                color: #aaaaaa;
+                                margin-bottom: 30px;
+                            ">
+                                Your ProductGap access is ready.
+                            </p>
+
+                            <a
+                                href="${{continueUrl}}"
+                                target="_top"
+                                style="
+                                    display: inline-block;
+                                    padding: 14px 28px;
+                                    background: #ff4b4b;
+                                    color: white;
+                                    text-decoration: none;
+                                    border-radius: 8px;
+                                    font-weight: 600;
+                                "
+                            >
+                                Continue to ProductGap
+                            </a>
+                        </div>
+                    `;
+                }}
+            }}
+        }});
+
+        Paddle.Checkout.open({{
+            items: [
+                {{
+                    priceId: "{PADDLE_PRICE_ID}",
+                    quantity: 1
+                }}
+            ]
+        }});
+    </script>
+</body>
+</html>
+"""
 
         components.html(
             checkout_html,
