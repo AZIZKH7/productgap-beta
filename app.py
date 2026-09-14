@@ -368,12 +368,13 @@ def verify_paddle_transaction(transaction_id):
         "Content-Type": "application/json",
         }
 
-
 def ensure_analysis_credit(transaction_id):
     if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
+        st.error("Supabase URL or secret key is missing.")
         return False
 
     if not transaction_id or not transaction_id.startswith("txn_"):
+        st.error("Invalid Paddle transaction ID.")
         return False
 
     try:
@@ -396,20 +397,20 @@ def ensure_analysis_credit(transaction_id):
             timeout=10,
         )
 
-if response.status_code in {200, 201, 204}:
-    return True
+        if response.status_code in {200, 201, 204}:
+            return True
 
-st.error(
-    f"Supabase credit creation failed — "
-    f"HTTP {response.status_code}: {response.text}"
-)
-return False
+        st.error(
+            f"Supabase credit creation failed — "
+            f"HTTP {response.status_code}: {response.text}"
+        )
+        return False
 
-except requests.RequestException as error:
-    st.error(
-        f"Supabase connection failed: {type(error).__name__}"
-    )
-    return False
+    except requests.RequestException as error:
+        st.error(
+            f"Supabase connection failed: {type(error).__name__}"
+        )
+        return False
 
 
 def get_analysis_credit(transaction_id):
