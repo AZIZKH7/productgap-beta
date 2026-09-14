@@ -362,6 +362,78 @@ if "authorized" not in st.session_state:
 
 paid_token = st.query_params.get("paid")
 def verify_paddle_transaction(transaction_id):
+    def supabase_headers():
+    return {
+        "apikey": SUPABASE_SECRET_KEY,
+        "Content-Type": "application/json",
+    }
+
+
+def ensure_analysis_credit(transaction_id):
+    if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
+        return False
+
+    if not transaction_id or not transaction_id.startswith("txn_"):
+        return False
+
+    try:
+        response = requests.post(
+            f"{SUPABASE_URL}/rest/v1/analysis_credits",
+            headers={
+                **supabase_headers(),
+                "Prefer": "resolution=ignore-duplicates,return=minimal",
+            },
+            params={
+                "on_conflict": "transaction_id"
+            },
+            json={
+                "transaction_id": transaction_id,
+                "price_id": PADDLE_PRICE_ID,
+                "paddle_environment": "sandbox",
+                "analyses_allowed": 1,
+                "analyses_used": 0,
+            },
+            timeout=10,
+        )
+
+        return response.status_code in {200, 201, 204}
+
+    except requests.RequestException:
+        return False
+
+
+def get_analysis_credit(transaction_id):
+    if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
+        return None
+
+    try:
+        response = requests.get(
+            f"{SUPABASE_URL}/rest/v1/analysis_credits",
+            headers=supabase_headers(),
+            params={
+                "transaction_id": f"eq.{transaction_id}",
+                "select": (
+                    "transaction_id,"
+                    "analyses_allowed,"
+                    "analyses_used,"
+                    "created_at,"
+                    "used_at"
+                ),
+            },
+            timeout=10,
+        )
+
+        response.raise_for_status()
+
+        rows = response.json()
+
+        if not rows:
+            return None
+
+        return rows[0]
+
+    except requests.RequestException:
+        return None
     if not PADDLE_API_KEY or not PADDLE_PRICE_ID:
         return False
 
@@ -403,7 +475,26 @@ if BETA_ACCESS_CODE:
 
 if transaction_id:
     if verify_paddle_transaction(transaction_id):
-        st.session_state.authorized = True
+
+        credit_created = ensure_analysis_credit(transaction_id)
+
+        credit = get_analysis_credit(transaction_id)
+
+        if (
+            credit_created
+            and credit
+            and credit["analyses_used"] < credit["analyses_allowed"]
+        ):
+            st.session_state.authorized = True
+
+        elif credit and credit["analyses_used"] < credit["analyses_allowed"]:
+            st.session_state.authorized = True
+
+        else:
+            st.session_state.authorized = False
+            st.warning(
+                "This ProductGap analysis credit has already been used."
+            )
    
 
     if not st.session_state.authorized and checkout_mode:
