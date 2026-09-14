@@ -36,7 +36,6 @@ PAYMENT_URL = secret("PAYMENT_URL")
 SUPPORT_EMAIL = secret("SUPPORT_EMAIL", "")
 PRODUCT_PRICE = secret("PRODUCT_PRICE", "$9")
 MODEL = secret("PRODUCTGAP_MODEL", "gpt-5.6-luna")
-PADDLE_RETURN_TOKEN = secret("PADDLE_RETURN_TOKEN")
 PADDLE_API_KEY = secret("PADDLE_API_KEY")
 PADDLE_PRICE_ID = secret("PADDLE_PRICE_ID")
 PADDLE_CLIENT_TOKEN = secret("PADDLE_CLIENT_TOKEN")
@@ -323,14 +322,10 @@ if BETA_ACCESS_CODE:
             st.query_params.clear()
             st.rerun()
 
-    # Old temporary sandbox return-token method
-    paid_token = st.query_params.get("paid")
 
-    if PADDLE_RETURN_TOKEN and paid_token == PADDLE_RETURN_TOKEN:
-        st.session_state.authorized = True
-        st.query_params.clear()
+   
 
-    # If not authorized, show the payment/access gate and STOP the app here
+
     
 
     if not st.session_state.authorized and checkout_mode:
