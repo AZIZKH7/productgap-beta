@@ -396,10 +396,9 @@ if BETA_ACCESS_CODE:
                 f"Get beta access — {PRODUCT_PRICE}",
                 f"{APP_URL}/?checkout=1",
                 use_container_width=True
-)
-            else:
-                st.info("Founding beta checkout is being connected.")
+            )
 
+            
         with right:
             st.subheader("Already have access?")
 
