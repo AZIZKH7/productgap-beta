@@ -272,9 +272,6 @@ if "authorized" not in st.session_state:
 
 paid_token = st.query_params.get("paid")
 
-if PADDLE_RETURN_TOKEN and paid_token == PADDLE_RETURN_TOKEN:
-    st.session_state.authorized = True
-    st.query_params.clear()
 if BETA_ACCESS_CODE:
     if "authorized" not in st.session_state: st.session_state.authorized=False
        paid_token = st.query_params.get("paid")
