@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import html
 from urllib.parse import urlparse, urlunparse
 import pandas as pd
 import streamlit as st
@@ -10,59 +11,80 @@ st.set_page_config(page_title="ProductGap — Find What Competitors Miss", page_
 
 st.markdown("""
 <style>
+:root {
+    --pg-bg: #0a0e15;
+    --pg-panel: #0e131d;
+    --pg-panel-2: #121824;
+    --pg-border: #252d3b;
+    --pg-border-soft: rgba(255,255,255,0.07);
+    --pg-text: #f5f7fb;
+    --pg-muted: #98a2b3;
+}
+
+html, body, [data-testid="stAppViewContainer"] {
+    background: var(--pg-bg);
+}
+
 .block-container {
     max-width: 1120px;
-    padding-top: 4.5rem !important;
-    padding-bottom: 4rem;
+    padding-top: 4.25rem !important;
+    padding-bottom: 5rem;
 }
 
 h1 {
     font-size: 3.1rem !important;
-    letter-spacing: -0.045em;
+    letter-spacing: -0.045em !important;
+    line-height: 1.04 !important;
+}
+
+h2, h3 {
+    letter-spacing: -0.025em !important;
 }
 
 .pg-muted {
-    color: #9aa3b2;
+    color: var(--pg-muted);
     font-size: 1.02rem;
     line-height: 1.65;
 }
 
-.pg-eyebrow {
-    font-size: .78rem;
-    letter-spacing: .13em;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: #9aa3b2;
-}
-
-.pg-good {
-    padding: 14px 16px;
-    border-radius: 12px;
-    background: rgba(46,160,94,.13);
-    border: 1px solid rgba(46,160,94,.28);
-}
-
-.pg-warn {
-    padding: 14px 16px;
-    border-radius: 12px;
-    background: rgba(230,166,30,.10);
-    border: 1px solid rgba(230,166,30,.25);
-}
-
-/* Premium ProductGap purchase card */
+.pg-eyebrow,
+.section-kicker,
 .offer-kicker {
     display: inline-flex;
     align-items: center;
     padding: 7px 12px;
-    margin-bottom: 14px;
     border-radius: 999px;
-    background: rgba(115,87,255,0.11);
-    border: 1px solid rgba(115,87,255,0.28);
-    color: #a99aff;
+    background: rgba(115,87,255,0.10);
+    border: 1px solid rgba(115,87,255,0.30);
+    color: #aa9cff;
     font-size: 12px;
-    font-weight: 700;
-    letter-spacing: .08em;
+    font-weight: 750;
+    letter-spacing: .09em;
+    text-transform: uppercase;
 }
+
+.pg-eyebrow {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #9aa3b2;
+}
+
+.offer-kicker { margin-bottom: 14px; }
+.section-kicker { margin-bottom: 12px; }
+
+.offer-title,
+.analysis-title,
+.report-title {
+    color: var(--pg-text);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.08;
+}
+
+.offer-title { font-size: 2rem; margin-bottom: 16px; }
+.analysis-title { font-size: 2.1rem; margin: 2px 0 8px; }
+.report-title { font-size: 2.2rem; margin: 2px 0 8px; }
 
 .offer-price {
     font-size: 44px;
@@ -71,11 +93,23 @@ h1 {
     margin-top: 14px;
 }
 
-.offer-price-note {
-    color: #9aa3b2;
-    font-size: 14px;
-    margin-bottom: 20px;
+.offer-price-note,
+.form-subtitle,
+.report-subtitle,
+.checkout-next-step,
+.trust-line,
+.form-note,
+.result-note {
+    color: var(--pg-muted);
+    line-height: 1.6;
 }
+
+.offer-price-note { font-size: 14px; margin-bottom: 20px; }
+.form-subtitle, .report-subtitle { font-size: 15px; margin-bottom: 18px; }
+.trust-line { font-size: 13px; text-align: center; margin-top: 12px; }
+.checkout-next-step { font-size: 13px; text-align: center; margin-top: 6px; }
+.form-note { font-size: 13px; margin: 8px 0 2px; }
+.result-note { font-size: 13px; margin-top: 10px; }
 
 .benefit-grid {
     display: grid;
@@ -87,91 +121,199 @@ h1 {
 .benefit {
     padding: 12px 13px;
     background: rgba(255,255,255,0.035);
-    border: 1px solid rgba(255,255,255,0.07);
+    border: 1px solid var(--pg-border-soft);
     border-radius: 12px;
     color: #d8dce6;
     font-size: 13px;
 }
 
-.trust-line {
-    color: #919aaa;
+.credit-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 11px;
+    margin: 2px 0 18px;
+    border-radius: 10px;
+    background: rgba(79, 121, 255, 0.09);
+    border: 1px solid rgba(79, 121, 255, 0.24);
+    color: #b9c8ff;
     font-size: 13px;
-    text-align: center;
-    margin-top: 10px;
+    font-weight: 650;
 }
 
-.checkout-next-step {
-    color: #919aaa;
-    font-size: 13px;
-    text-align: center;
-    margin-top: 6px;
+.used-credit-notice {
+    margin: 0 0 16px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(115,87,255,0.08);
+    border: 1px solid rgba(115,87,255,0.26);
+    color: #dcd7ff;
+    font-size: 14px;
+    line-height: 1.55;
+}
+.used-credit-notice strong { color: #ffffff; }
+
+.metric-card {
+    min-height: 112px;
+    padding: 18px 18px 16px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018));
+    border: 1px solid var(--pg-border-soft);
+}
+.metric-label {
+    color: var(--pg-muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+.metric-value {
+    color: var(--pg-text);
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    line-height: 1;
+}
+.metric-foot {
+    color: #7f8a9c;
+    font-size: 12px;
+    margin-top: 8px;
 }
 
-/* Stable button styling: no transforms/backdrop filters that can flicker on scroll. */
-[data-testid="stLinkButton"] > a {
-    background: linear-gradient(
-        135deg,
-        #7357ff 0%,
-        #4d7cff 55%,
-        #2997ff 100%
-    ) !important;
+.verdict-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+.verdict-good {
+    color: #8cf0b2;
+    background: rgba(46,160,94,.12);
+    border: 1px solid rgba(46,160,94,.30);
+}
+.verdict-warn {
+    color: #ffd98a;
+    background: rgba(230,166,30,.09);
+    border: 1px solid rgba(230,166,30,.26);
+}
+.opportunity-name {
+    color: var(--pg-text);
+    font-size: 1.55rem;
+    line-height: 1.2;
+    font-weight: 780;
+    letter-spacing: -0.025em;
+    margin-bottom: 18px;
+}
+.subtle-label {
+    color: #8792a4;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+/* Stable elevated surfaces. No blur/backdrop-filter/transform effects. */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background: var(--pg-panel);
+    border-color: var(--pg-border) !important;
+    border-radius: 18px !important;
+}
+
+[data-testid="stForm"] {
+    background: var(--pg-panel);
+    border: 1px solid var(--pg-border) !important;
+    border-radius: 18px !important;
+    padding: 18px 18px 12px !important;
+}
+
+div[data-baseweb="input"] > div {
+    background: #151b27 !important;
+    border: 1px solid #2a3344 !important;
+    border-radius: 12px !important;
+    min-height: 46px;
+}
+div[data-baseweb="input"] > div:focus-within {
+    border-color: rgba(115,87,255,.75) !important;
+    box-shadow: 0 0 0 2px rgba(115,87,255,.12) !important;
+}
+div[data-baseweb="input"] input {
+    color: #f4f6fa !important;
+}
+
+[data-testid="stLinkButton"] > a,
+.stButton button[kind="primary"],
+[data-testid="stFormSubmitButton"] button,
+[data-testid="stDownloadButton"] button {
+    background: linear-gradient(135deg, #7357ff 0%, #4d7cff 55%, #2997ff 100%) !important;
     color: white !important;
     border: 0 !important;
     border-radius: 14px !important;
     min-height: 54px;
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    box-shadow: 0 12px 30px rgba(73,92,255,0.28);
+    font-size: 15px !important;
+    font-weight: 750 !important;
+    box-shadow: 0 12px 30px rgba(73,92,255,0.24);
 }
-
-[data-testid="stLinkButton"] > a:hover {
-    box-shadow: 0 14px 34px rgba(73,92,255,0.36);
-}
-
-[data-testid="stButton"] > button {
-    min-height: 50px;
-    border-radius: 14px !important;
-}
-
-.stButton button[kind="primary"] {
-    background: linear-gradient(
-        135deg,
-        #7357ff 0%,
-        #4d7cff 55%,
-        #2997ff 100%
-    ) !important;
-    color: white !important;
+[data-testid="stLinkButton"] > a:hover,
+.stButton button[kind="primary"]:hover,
+[data-testid="stFormSubmitButton"] button:hover,
+[data-testid="stDownloadButton"] button:hover {
+    box-shadow: 0 14px 34px rgba(73,92,255,0.34);
     border: 0 !important;
-    border-radius: 14px !important;
-    min-height: 54px;
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    box-shadow: 0 12px 30px rgba(73,92,255,0.28);
+}
+[data-testid="stButton"] > button:not([kind="primary"]) {
+    min-height: 48px;
+    border-radius: 12px !important;
+    background: #121823 !important;
+    border: 1px solid #2a3344 !important;
+    color: #e8ebf2 !important;
 }
 
-/* Hide Streamlit heading anchor/link icons */
-.stHeading a {
+[data-testid="stStatusWidget"] {
+    border: 1px solid var(--pg-border) !important;
+    border-radius: 14px !important;
+    background: var(--pg-panel) !important;
+}
+[data-testid="stExpander"] {
+    border-color: var(--pg-border) !important;
+    border-radius: 12px !important;
+    background: rgba(255,255,255,0.012) !important;
+}
+[data-testid="stMetric"] {
+    padding: 14px 14px 12px;
+    border: 1px solid var(--pg-border-soft);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.025);
+}
+button[data-baseweb="tab"] {
+    font-weight: 650 !important;
+}
+
+/* Hide Streamlit heading anchor/link icons. */
+.stHeading a,
+a.anchor-link,
+[data-testid="stHeadingWithActionElements"] [data-testid="stHeaderActionElements"] {
     display: none !important;
 }
 
 @media (max-width: 700px) {
     .block-container {
-        padding-top: 2.5rem !important;
+        padding-top: 2.4rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
-
-    h1 {
-        font-size: 2.35rem !important;
-    }
-
-    .benefit-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .offer-price {
-        font-size: 38px;
-    }
+    h1 { font-size: 2.25rem !important; }
+    .offer-title, .analysis-title, .report-title { font-size: 1.72rem; }
+    .benefit-grid { grid-template-columns: 1fr; }
+    .offer-price { font-size: 38px; }
+    .metric-card { min-height: 94px; padding: 15px; }
+    .metric-value { font-size: 29px; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -595,6 +737,8 @@ transaction_id = st.query_params.get("txn")
 if isinstance(transaction_id, list):
     transaction_id = transaction_id[-1] if transaction_id else None
 
+used_purchase_credit = False
+
 # A verified, unused Paddle transaction is the paid entitlement.
 if transaction_id and not st.session_state.authorized:
     if verify_paddle_transaction(transaction_id):
@@ -610,8 +754,14 @@ if transaction_id and not st.session_state.authorized:
                 st.session_state.access_source = "transaction"
                 st.session_state.purchase_transaction_id = transaction_id
             elif credit:
-                st.warning(
-                    "This purchase's ProductGap analysis credit has already been used."
+                used_purchase_credit = True
+                st.markdown(
+                    """
+                    <div class="used-credit-notice">
+                        <strong>Analysis completed.</strong> This purchase's one ProductGap analysis credit has already been used.
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
             else:
                 st.error(
@@ -762,7 +912,10 @@ if not st.session_state.authorized:
         spacer_left, main, spacer_right = st.columns([0.12, 1, 0.12])
 
         with main:
-            st.markdown("## Find the opportunity your competitors missed.")
+            st.markdown(
+                '<div class="offer-title">Find the opportunity your competitors missed.</div>',
+                unsafe_allow_html=True,
+            )
 
             st.write(
                 "Paste 3 competing products and get an evidence-backed market report "
@@ -788,8 +941,13 @@ if not st.session_state.authorized:
                 unsafe_allow_html=True,
             )
 
+            purchase_cta = (
+                f"Buy another analysis — {PRODUCT_PRICE} →"
+                if used_purchase_credit
+                else f"Analyze my market — {PRODUCT_PRICE} →"
+            )
             st.link_button(
-                f"Analyze my market — {PRODUCT_PRICE} →",
+                purchase_cta,
                 f"{APP_URL}/?checkout=1",
                 use_container_width=True,
             )
@@ -833,15 +991,46 @@ if not OPENAI_API_KEY:
     st.error("ProductGap is not configured. Add OPENAI_API_KEY to the server secrets.")
     st.stop()
 
-st.subheader("Analyze a market")
-st.caption("Use three competing products that solve roughly the same problem. ProductGap infers the category automatically.")
+paid_transaction_id = st.session_state.get("purchase_transaction_id")
+paid_access = st.session_state.get("access_source") == "transaction"
+
+st.markdown('<div class="section-kicker">MARKET ANALYSIS</div>', unsafe_allow_html=True)
+st.markdown('<div class="analysis-title">Turn 3 competitor URLs into a product verdict.</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="form-subtitle">Use three products that solve roughly the same problem. '
+    'ProductGap researches public customer evidence and ranks the strongest opportunities.</div>',
+    unsafe_allow_html=True,
+)
+
+if paid_access:
+    st.markdown(
+        '<div class="credit-pill">✓ 1 paid analysis credit ready</div>',
+        unsafe_allow_html=True,
+    )
+elif st.session_state.get("access_source") == "access_code":
+    st.markdown(
+        '<div class="credit-pill">✓ Access code active</div>',
+        unsafe_allow_html=True,
+    )
 
 with st.form("form"):
-    u1=st.text_input("Competitor 1 URL",placeholder="https://...")
-    u2=st.text_input("Competitor 2 URL",placeholder="https://...")
-    u3=st.text_input("Competitor 3 URL",placeholder="https://...")
-    agree=st.checkbox("I understand this is decision-support research, not a guarantee of product success.")
-    submitted=st.form_submit_button("Analyze market",type="primary",use_container_width=True)
+    u1 = st.text_input("01  Competitor 1 URL", placeholder="https://...")
+    u2 = st.text_input("02  Competitor 2 URL", placeholder="https://...")
+    u3 = st.text_input("03  Competitor 3 URL", placeholder="https://...")
+
+    st.markdown(
+        '<div class="form-note">Tip: use exact product pages, not search-result or category pages.</div>',
+        unsafe_allow_html=True,
+    )
+
+    agree = st.checkbox(
+        "I understand this is decision-support research, not a guarantee of product success."
+    )
+    submitted = st.form_submit_button(
+        "Run market analysis →",
+        type="primary",
+        use_container_width=True,
+    )
 
 if submitted:
     products = [x.strip() for x in [u1, u2, u3] if x.strip()]
@@ -853,9 +1042,6 @@ if submitted:
     if not agree:
         st.error("Please confirm the research limitation.")
         st.stop()
-
-    paid_transaction_id = st.session_state.get("purchase_transaction_id")
-    paid_access = st.session_state.get("access_source") == "transaction"
 
     # Block a second analysis before spending another OpenAI request.
     if paid_access:
@@ -872,9 +1058,10 @@ if submitted:
             )
             st.stop()
 
-    with st.status("Researching competitors…", expanded=True) as s:
-        st.write("Finding product-specific customer evidence and independent sources.")
-        st.write("Evaluating demand proxies, competition, recurring pain and differentiation.")
+    with st.status("Researching public customer evidence…", expanded=True) as s:
+        st.write("Scanning product-specific complaints, praise and ownership friction.")
+        st.write("Cross-checking demand proxies, competition and differentiation room.")
+        st.write("Ranking opportunities and defining validation / kill conditions.")
 
         try:
             data, sources = run_research(products)
@@ -901,53 +1088,103 @@ if submitted:
                 show_support_hint()
                 st.stop()
 
-        s.update(label="Research complete", state="complete")
+        s.update(label="Opportunity report ready", state="complete")
 
     evdf = evidence_table(data, sources)
     mscore = market_score(data.get("market", {}))
     ops = ranked_ops(data, evdf, mscore)
 
-    if not ops:
-        st.warning(
-            "No defensible product opportunity was found from the available evidence. "
-            "That is still the result of this completed market analysis."
-        )
-        st.markdown(f"**Category:** {data.get('category', 'Unknown')}")
-        st.write(data.get("executive_summary", ""))
-        st.stop()
-
-    best = ops[0]
-    x, y, z = st.columns(3)
-    x.metric("Market score", f"{mscore}/100")
-    y.metric("Evidence observations", len(evdf))
-    z.metric("Best opportunity", f"{best['score']}/100")
-
-    css = "pg-good" if best["score"] >= 60 else "pg-warn"
+    st.markdown('<div class="section-kicker">OPPORTUNITY REPORT</div>', unsafe_allow_html=True)
+    st.markdown('<div class="report-title">Your market verdict is ready.</div>', unsafe_allow_html=True)
     st.markdown(
-        f'<div class="{css}"><b>{verdict(best["score"])}</b><br>'
-        f'<span style="font-size:1.2rem;font-weight:700">#1 {best["name"]}</span></div>',
+        f'<div class="report-subtitle">Category: {html.escape(str(data.get("category", "Unknown")))}</div>',
         unsafe_allow_html=True,
     )
 
-    st.markdown("### Why this opportunity exists")
-    st.write(best["why"])
-    st.markdown(f"**Target buyer:** {best['target']}")
-    st.markdown(f"**Positioning:** {best['positioning']}")
+    if not ops:
+        with st.container(border=True):
+            st.markdown(
+                '<div class="verdict-badge verdict-warn">NO DEFENSIBLE OPPORTUNITY YET</div>',
+                unsafe_allow_html=True,
+            )
+            st.write(
+                "ProductGap did not find a strong enough opportunity from the available public evidence. "
+                "That is still the result of this completed market analysis."
+            )
+            st.write(data.get("executive_summary", ""))
+        st.stop()
+
+    best = ops[0]
+
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.markdown(
+            f'''<div class="metric-card">
+                    <div class="metric-label">Market score</div>
+                    <div class="metric-value">{mscore}<span style="font-size:18px;color:#7f8a9c">/100</span></div>
+                    <div class="metric-foot">Overall category attractiveness</div>
+                </div>''',
+            unsafe_allow_html=True,
+        )
+    with m2:
+        st.markdown(
+            f'''<div class="metric-card">
+                    <div class="metric-label">Evidence</div>
+                    <div class="metric-value">{len(evdf)}</div>
+                    <div class="metric-foot">Customer / market observations</div>
+                </div>''',
+            unsafe_allow_html=True,
+        )
+    with m3:
+        st.markdown(
+            f'''<div class="metric-card">
+                    <div class="metric-label">Best opportunity</div>
+                    <div class="metric-value">{best["score"]}<span style="font-size:18px;color:#7f8a9c">/100</span></div>
+                    <div class="metric-foot">Highest-ranked product concept</div>
+                </div>''',
+            unsafe_allow_html=True,
+        )
+
+    st.write("")
+    verdict_class = "verdict-good" if best["score"] >= 60 else "verdict-warn"
+    with st.container(border=True):
+        st.markdown(
+            f'<div class="verdict-badge {verdict_class}">{html.escape(verdict(best["score"]))}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="opportunity-name">#1 {html.escape(str(best["name"]))}</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown('<div class="subtle-label">Why this opportunity exists</div>', unsafe_allow_html=True)
+        st.write(best["why"])
+
+        target_col, position_col = st.columns(2)
+        with target_col:
+            st.markdown('<div class="subtle-label">Target buyer</div>', unsafe_allow_html=True)
+            st.write(best["target"])
+        with position_col:
+            st.markdown('<div class="subtle-label">Positioning</div>', unsafe_allow_html=True)
+            st.write(best["positioning"])
 
     t1, t2, t3 = st.tabs(["Opportunity", "Evidence", "Market"])
 
     with t1:
-        st.markdown("#### What to change")
-        for item in best["changes"]:
-            st.write("•", item)
+        with st.container(border=True):
+            st.markdown('<div class="subtle-label">What to change</div>', unsafe_allow_html=True)
+            for item in best["changes"]:
+                st.write("•", item)
 
-        st.markdown("#### Validate before investing")
-        for item in best["tests"]:
-            st.write("•", item)
+        with st.container(border=True):
+            st.markdown('<div class="subtle-label">Validate before investing</div>', unsafe_allow_html=True)
+            for item in best["tests"]:
+                st.write("•", item)
 
-        st.markdown("#### Kill the idea if…")
-        for item in best["kills"]:
-            st.write("•", item)
+        with st.container(border=True):
+            st.markdown('<div class="subtle-label">Kill the idea if…</div>', unsafe_allow_html=True)
+            for item in best["kills"]:
+                st.write("•", item)
 
         for i, opportunity in enumerate(ops[1:], start=2):
             with st.expander(
@@ -984,18 +1221,21 @@ if submitted:
         for col, (label, key) in zip(cols, labels):
             col.metric(label, f"{market.get(key, '?')}/5")
 
-        st.write(market.get("rationale", ""))
-        st.markdown(f"**Category:** {data.get('category', 'Unknown')}")
+        with st.container(border=True):
+            st.markdown('<div class="subtle-label">Market rationale</div>', unsafe_allow_html=True)
+            st.write(market.get("rationale", ""))
+            st.markdown(f"**Category:** {data.get('category', 'Unknown')}")
 
     report = report_text(data, mscore, ops, sources)
     st.download_button(
-        "Download full opportunity report",
+        "Download opportunity report ↓",
         report.encode("utf-8"),
         file_name="productgap_opportunity_report.md",
         mime="text/markdown",
         use_container_width=True,
         on_click="ignore",
     )
-    st.caption(
-        "ProductGap uses publicly indexed evidence and does not claim to scrape every customer review."
+    st.markdown(
+        '<div class="result-note">ProductGap uses publicly indexed evidence and does not claim to scrape every customer review.</div>',
+        unsafe_allow_html=True,
     )
