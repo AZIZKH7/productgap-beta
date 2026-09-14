@@ -658,12 +658,12 @@ if not st.session_state.authorized:
     with main:
         st.markdown("## Find the opportunity your competitors missed.")
 
-            st.write(
+        st.write(
                 "Paste 3 competing products and get an evidence-backed market report "
                 "built from public customer complaints, unmet needs and competitive signals."
             )
 
-            st.markdown(
+        st.markdown(
                 f"""
                 <div class="offer-price">{PRODUCT_PRICE}</div>
                 <div class="offer-price-note">
@@ -715,7 +715,7 @@ if not st.session_state.authorized:
                     else:
                         st.error("That access code is not valid.")
 
-    st.stop()
+        st.stop()
     
 if not OPENAI_API_KEY:
     st.error("ProductGap is not configured. Add OPENAI_API_KEY to the server secrets.")
