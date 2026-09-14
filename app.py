@@ -319,6 +319,69 @@ if BETA_ACCESS_CODE:
         st.query_params.clear()
 
     # If not authorized, show the payment/access gate and STOP the app here
+        checkout_mode = st.query_params.get("checkout") == "1"
+
+    if not st.session_state.authorized and checkout_mode:
+        st.subheader("ProductGap — Founding Beta")
+        st.caption("Secure $9 test checkout powered by Paddle.")
+
+        checkout_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+        </head>
+
+        <body>
+            <div class="checkout-container"></div>
+
+            <script>
+                Paddle.Environment.set("sandbox");
+
+                Paddle.Initialize({{
+                    token: "{PADDLE_CLIENT_TOKEN}",
+
+                    checkout: {{
+                        settings: {{
+                            displayMode: "inline",
+                            frameTarget: "checkout-container",
+                            frameInitialHeight: "450",
+                            frameStyle: "width: 100%; min-width: 312px; background-color: transparent; border: none;",
+                            variant: "one-page"
+                        }}
+                    }},
+
+                    eventCallback: function(event) {{
+                        if (event.name === "checkout.completed") {{
+                            const transactionId = event.data.transaction_id;
+
+                            window.top.location.href =
+                                "{APP_URL}/?txn=" +
+                                encodeURIComponent(transactionId);
+                        }}
+                    }}
+                }});
+
+                Paddle.Checkout.open({{
+                    items: [
+                        {{
+                            priceId: "{PADDLE_PRICE_ID}",
+                            quantity: 1
+                        }}
+                    ]
+                }});
+            </script>
+        </body>
+        </html>
+        """
+
+        components.html(
+            checkout_html,
+            height=650,
+            scrolling=False
+        )
+
+        st.stop()
     if not st.session_state.authorized:
         left, right = st.columns([1.4, 1])
 
@@ -329,12 +392,11 @@ if BETA_ACCESS_CODE:
                 "evidence, validation tests and a downloadable report."
             )
 
-            if PAYMENT_URL:
-                st.link_button(
-                    f"Get beta access — {PRODUCT_PRICE}",
-                    PAYMENT_URL,
-                    use_container_width=True,
-                )
+            st.link_button(
+                f"Get beta access — {PRODUCT_PRICE}",
+                f"{APP_URL}/?checkout=1",
+                use_container_width=True
+)
             else:
                 st.info("Founding beta checkout is being connected.")
 
