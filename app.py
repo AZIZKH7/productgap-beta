@@ -396,10 +396,20 @@ def ensure_analysis_credit(transaction_id):
             timeout=10,
         )
 
-        return response.status_code in {200, 201, 204}
+if response.status_code in {200, 201, 204}:
+    return True
 
-    except requests.RequestException:
-        return False
+st.error(
+    f"Supabase credit creation failed — "
+    f"HTTP {response.status_code}: {response.text}"
+)
+return False
+
+except requests.RequestException as error:
+    st.error(
+        f"Supabase connection failed: {type(error).__name__}"
+    )
+    return False
 
 
 def get_analysis_credit(transaction_id):
