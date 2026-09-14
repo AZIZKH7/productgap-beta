@@ -354,14 +354,47 @@ if BETA_ACCESS_CODE:
                         }}
                     }},
 
-                    eventCallback: function(event) {{
-                        if (event.name === "checkout.completed") {{
-                            const transactionId = event.data.transaction_id;
+                    eventCallback: function(event) {
+    if (event.name === "checkout.completed") {
+        const transactionId = event.data.transaction_id;
+        const continueUrl =
+            "{APP_URL}/?txn=" +
+            encodeURIComponent(transactionId);
 
-                            window.top.location.href =
-                                "{APP_URL}/?txn=" +
-                                encodeURIComponent(transactionId);
-                        }}
+        document.body.innerHTML = `
+            <div style="
+                font-family: Arial, sans-serif;
+                text-align: center;
+                padding: 60px 20px;
+                color: white;
+                background: #0e1117;
+                min-height: 450px;
+            ">
+                <div style="font-size:64px; margin-bottom:20px;">✓</div>
+                <h2>Payment successful</h2>
+                <p style="color:#aaa; margin-bottom:30px;">
+                    Your ProductGap access is ready.
+                </p>
+
+                <a
+                    href="${continueUrl}"
+                    target="_blank"
+                    style="
+                        display:inline-block;
+                        padding:14px 28px;
+                        background:#ff4b4b;
+                        color:white;
+                        text-decoration:none;
+                        border-radius:8px;
+                        font-weight:600;
+                    "
+                >
+                    Continue to ProductGap
+                </a>
+            </div>
+        `;
+    }
+}
                     }}
                 }});
 
