@@ -123,6 +123,9 @@ PADDLE_PRICE_ID = secret("PADDLE_PRICE_ID")
 PADDLE_CLIENT_TOKEN = secret("PADDLE_CLIENT_TOKEN")
 APP_URL = secret("APP_URL", "https://marketgap-ai.streamlit.app")
 
+SUPABASE_URL = secret("SUPABASE_URL")
+SUPABASE_SECRET_KEY = secret("SUPABASE_SECRET_KEY")
+
 checkout_mode = st.query_params.get("checkout") == "1"
 SOURCE_QUALITY = {
     "retailer_review":1.0, "marketplace_review":1.0, "professional_review":0.82,
