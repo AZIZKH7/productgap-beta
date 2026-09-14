@@ -389,7 +389,7 @@ if BETA_ACCESS_CODE:
 
                             <a
                                 href="${{continueUrl}}"
-                                target="_top"
+                                target="_blank"
                                 style="
                                     display: inline-block;
                                     padding: 14px 28px;
