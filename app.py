@@ -319,7 +319,7 @@ if BETA_ACCESS_CODE:
         st.query_params.clear()
 
     # If not authorized, show the payment/access gate and STOP the app here
-        checkout_mode = st.query_params.get("checkout") == "1"
+    checkout_mode = st.query_params.get("checkout") == "1"
 
     if not st.session_state.authorized and checkout_mode:
         st.subheader("ProductGap — Founding Beta")
