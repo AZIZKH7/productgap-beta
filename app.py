@@ -1948,7 +1948,7 @@ if not st.session_state.authorized and checkout_mode:
 </html>
 """
 
-    st.iframe(checkout_html, height=650, scrolling=False)
+    st.iframe(checkout_html, height=650 )
     st.stop()
 
 
