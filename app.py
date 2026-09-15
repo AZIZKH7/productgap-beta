@@ -995,7 +995,34 @@ def run_research(products):
 
     data = validate_research_payload(data)
     return data, collect_urls(response_dump)
+def build_report_sources(products, evdf):
+    candidates = []
 
+    # Always include the 3 submitted competitor URLs
+    for url in products:
+        if valid_url(url):
+            candidates.append(product_url_key(url))
+
+    # Only include sources that actually support evidence in the report
+    if evdf is not None and not evdf.empty:
+        verified = evdf[evdf["Verified"] == True]
+
+        for src in verified["Source"].tolist():
+            if valid_url(src):
+                candidates.append(product_url_key(src))
+
+    # Remove duplicates
+    cleaned = []
+    seen = set()
+
+    for url in candidates:
+        key = normalize_url(url)
+
+        if key and key not in seen:
+            seen.add(key)
+            cleaned.append(url)
+
+    return cleaned
 def evidence_table(data, sources):
     # Only evidence URLs that were actually surfaced by the web-search tool are
     # allowed to contribute to scoring. Same-domain evidence is not enough.
@@ -2219,6 +2246,7 @@ if submitted:
             st.stop()
 
         evdf = evidence_table(data, sources)
+        report_sources = build_report_sources(products, evdf)
         mscore = market_score(data.get("market", {}))
         ops = ranked_ops(data, evdf, mscore)
         report_markdown = report_text(data, mscore, ops, sources)
