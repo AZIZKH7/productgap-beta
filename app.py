@@ -2249,8 +2249,8 @@ if submitted:
         report_sources = build_report_sources(products, evdf)
         mscore = market_score(data.get("market", {}))
         ops = ranked_ops(data, evdf, mscore)
-        report_markdown = report_text(data, mscore, ops, sources)
-        state = build_report_state(data, sources, evdf, mscore, ops)
+        report_markdown = report_text(data, mscore, ops, report_sources)
+        state = build_report_state(data, report_sources, evdf, mscore, ops)
 
         if paid_access:
             if not complete_analysis_run(paid_transaction_id, state, report_markdown):
